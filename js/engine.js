@@ -510,7 +510,7 @@
     if (state.pending && state.pending.seat !== seat) delete v.pending.drawn;
     if (state.phase === 'bid') {
       v.bids = state.bids.map((b, p) => (p === seat || p === state.ghost ? b : null));
-      v.bidIn = state.bids.map(b => b != null);
+      v.bidIn = state.bidIn ? state.bidIn.slice() : state.bids.map(b => b != null); // a rebuilt online view keeps the room's list
     }
     if (state.phase === 'cannon') v.cannon = state.cannon.map((c, p) => (p === seat ? c : false));
     v.seat = seat;

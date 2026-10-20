@@ -413,6 +413,44 @@
     return level === 'easy' ? easyChoice(sim, seat, rand) : mediumChoice(sim, seat);
   }
 
+  // Chance each legal card wins the current trick if played now (medium's
+  // estimate from the unseen cards). Tigress counted as a pirate.
+  function cardOdds(st, seat) {
+    const sim = seatSim(st, seat);
+    const cn = copyCounts(sim.rem);
+    for (const id of st.hands[seat]) addCard(cn, id, -1);
+    const H = cardsAfter(sim);
+    const out = {};
+    for (const id of legalFrom(st.hands[seat], st.trick)) {
+      const pl = CARDS[id].k === 'tig' ? { p: seat, id, as: 'pir' } : { p: seat, id };
+      out[id] = pWin(st.trick.concat([pl]), seat, cn, H);
+    }
+    return out;
+  }
+
+  // "Can it be beaten?" table: chance that nobody else holds a card that can
+  // legally beat `id` when you lead it, by random deal (Monte Carlo).
+  function unbeatenChance(id, players, cards, opts, samples, rand) {
+    rand = rand || Math.random;
+    const deck = SK.deckIds(opts).filter(x => x !== id);
+    const lead = CARDS[id].k === 'tig' ? { p: 0, id, as: 'pir' } : { p: 0, id };
+    let safe = 0;
+    for (let s = 0; s < samples; s++) {
+      SK.shuffle(deck, rand);
+      let beaten = false;
+      for (let p = 1; p < players && !beaten; p++) {
+        const hand = deck.slice((p - 1) * cards, p * cards);
+        for (const x of legalFrom(hand, [lead])) {
+          const pl = CARDS[x].k === 'tig' ? { p, id: x, as: 'pir' } : { p, id: x };
+          const r = resolveTrick([lead, pl]);
+          if (r.winner === p || r.destroyed) { beaten = true; break; }
+        }
+      }
+      if (!beaten) safe++;
+    }
+    return safe / samples;
+  }
+
   // Pirate abilities for computer seats (simple rules of thumb).
   function decideAbility(st, seat) {
     const a = st.pending.ability;
@@ -474,7 +512,7 @@
     newCounts, addCard, countsOf, copyCounts, noneOf, pWin, power, optionsFor,
     simFromState, simPlay, simScore, rollout, mediumChoice, easyChoice,
     expectedTricksCounts, mediumBid, determinize, evaluatePlays, bidStudy, beforeCount,
-    decideBid, decideCannon, decidePlay, decideAbility, act,
+    decideBid, decideCannon, decidePlay, decideAbility, act, cardOdds, unbeatenChance,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = AI;
   else root.SKAI = AI;
