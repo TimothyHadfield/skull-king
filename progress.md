@@ -1,7 +1,7 @@
 # Skull King: progress
 
 ## START HERE
-Read in this order: this file → `CLAUDE.md` → `docs/rules-check.md` (rules and sources) → `docs/ideas.md`. Last updated **2026-10-20** (first build + phase 2 + QA fixes + visual design pass + sounds/celebrations/animations, assets ?v=5).
+Read in this order: this file → `CLAUDE.md` → `docs/rules-check.md` (rules and sources) → `docs/ideas.md`. Last updated **2026-10-20** (first build + phase 2 + QA fixes + visual design pass + sounds/celebrations/animations + real-table Play screen, assets ?v=6).
 
 ## Goal right now
 A Skull King site for Tim's phone: a real-table scorekeeper and bid advisor (used most), plus the full game with exact rules against computers or friends online.
@@ -18,6 +18,7 @@ A Skull King site for Tim's phone: a real-table scorekeeper and bid advisor (use
 | QA round (2026-10-20): reload after round 1 froze vs-computer games (`PLAY.log` not restored); advisor hand/picker/chart overflow at 10/13/23 cards; impossible trick totals; New→Undo lost top buttons; 8-player side table clipped; stale sheet history on reload; duplicate online names; failed join cleared the code | Fixed; checked by scratch scripts `sk-qa-verify.mjs` + `sk-qa-net.mjs` (reload bug reproduced on the old live build first) |
 | Visual design pass (2026-10-20): bigger hand/trick cards sized by count (hand = one row or two even rows, trick = one slot per player), centred bid pad, desktop Bid tab layout fixed, readable Game length dropdown, odds table corner specks gone, 40px steppers/bonus chips, true minus signs | Done; before/after screenshots in the manager's scratchpad `design/skull-king/` |
 | Sound & effects (2026-10-20): shared `js/fx.js` 1.0.1 (copied unchanged from `_fx/`) + game-local `js/sfx.js` (state-diff → sounds/animations, 6 custom sounds); "Sound & effects" group in Settings; scorekeeper ticks/count-up/finish confetti | Done; see the event→sound map below |
+| Real-table Play screen (2026-10-20): dark-wood table from the shared `_table` kit (`js/table.js` + `css/table.css`, byte copies). Opponents round the far side with a name plate, a fan of card backs and, in front of them, a bid token plus their won tricks as small face-down cards. Each trick card lies in front of whoever played it. The deck is on the table, your hand is fanned at the bottom, and a paper score pad on the table opens the round table on phone (the side panel shows it on laptop). Cards deal from the deck with a flip, opponents' cards turn up as they land, and the finished trick slides to the winner. fx.js re-copied at 1.0.3 | Done; research in the manager's scratchpad `table/skull-king/real.md`, before/after shots in `table/skull-king/` (10 states x 393, 1280, 320, 659-landscape: 40/40 with no overflow and no errors), 2 reviewer rounds |
 | Tests: engine 37, ai 9, online 5, fx 9 (all pass); engine/ai/online each seen failing under a deliberate bug (50 mutations); fx test failed before sfx.js existed and caught 11/11 mutations | Done |
 
 ## Event → sound map (js/sfx.js; same for you, computers and online players)
@@ -63,6 +64,7 @@ BID_SCALE 1.15 chosen by tuning (medium mirror avg score: 0.7 → −21, 0.85 �
 - "also skull king" (the game list: a bidding-odds trick-taking game).
 - "build regular play online with a computer or other online players for all the games and their common varients that match exactly the play of the in-person game… Brainstorm what additions you can do… Implement your good ideas… Really work on the webdesign… art… make sure that everything works properlly… Make sure to get everything right like rules and artwork and specific numbers of cards…"
 - "add opptional sounds you can add to the games that reflect what's happening in the game accurately as well as win celebrations, and other fun annimations to go along with everything. Just make sure everything is customizable in the settings so the user can play as preffered." (2026-10-20)
+- "could you also make sure that each of the games also have a look to them so that the game (either board or card layout) looks almost identical to how the board or card layout looks like in real life, so it's easy to understand if you've already played it before, and also so it feels more like you're actually playing in real life rather than you're playing it online. Even things like how youre cards or other things are laid out infront of you, make it look like they are actual cards laid out similar to how it looks like in real life. Make the decks look like actual decks. Make the board have the same design as it does in real life with the same layouts. It should look kind of like you're looking through a camera that is connected to a user's glasses that is playing in real life (not actually, but the layout and style of everything should be similar)." (2026-10-20)
 - From the common brief: real-table companion first; odds at the point of decision; computers with measured strength; study mode; dark phone-first look on the Hub tokens; $0; no copyrighted art or rule text.
 
 ## Traps
@@ -76,6 +78,11 @@ BID_SCALE 1.15 chosen by tuning (medium mirror avg score: 0.7 → −21, 0.85 �
 - Port 8231 on this laptop may be another agent's server; use your own port.
 - `js/fx.js` is shared: never edit it here; re-copy from `Board and Card Games/_fx/fx.js` (it changed 1.0.0 → 1.0.1 mid-build). Game sounds go in `js/sfx.js` via `FX.define`.
 - Headless WebKit on Windows has no Web Audio: `FX.play` returns false there. Check sounds with a spy on `FX.play` (pattern: manager scratchpad `design/skull-king-fx/sk-fx.mjs`) or with `--engine chrome`, which really plays.
+- `js/table.js`, `css/table.css` are shared `_table` kit copies: never edit them here; re-copy. Game-side table styles live in app.css under "play: the table from your seat".
+- Re-rendered fanned cards slide in from x=0 unless `.table` has `tbl-instant` while mounting (`mountTable` adds it and removes it after 2 frames). Headless WebKit stalls transitions and shows that bug clearly.
+- The global `.empty` class (padding 18px) once squashed the empty bid token into an oval; the token uses `nobid` now. Don't reuse generic class names on the table.
+- sfx.js finds seats by `.seatbox[data-seat]` and bid numbers by `.bidtok`: keep those selectors if the table markup changes.
+- Other agents' Python servers sit on "random" ports and serve other games: use a node server on port 0 (scratch `table/skull-king/serve.cjs`).
 - Sounds are driven by `PLAY.fxArmed/fxPrev` (set in `applyAction`, `startGame`, `onNetSnap`; consumed in `afterChange`). A new state path must arm it too or it will be silent.
 
 ## Decisions
@@ -84,7 +91,8 @@ BID_SCALE 1.15 chosen by tuning (medium mirror avg score: 0.7 → −21, 0.85 �
 - Online round results aren't paused; each player sees the results sheet when the round ends.
 - 6+ players: the side "This game" table shows 3-letter names (full name on hover) so all columns fit.
 - Score Tricks phase: Next is disabled until tricks add up to the hand size (fewer allowed only with Kraken/Whale in play).
-- Play layout: hand cards up to 64 px (phone) / 88 px (laptop); more than 6 (phone) or 8 (laptop) cards split into two even rows. Bid pad up to 8 (phone) / 14 (laptop) per row. During bidding the empty trick area collapses so round 10 fits at 393x659.
+- Play layout (2026-10-20, replaces the row layout): one fanned hand (76 px cards on phone, 100 px on laptop); trick cards are anchored in front of each seat (`trickAnchor` in app.js). Phone on its side moves the actions to the right edge. Laptop seats curve down toward the sides.
+- Table look choices made without Tim: dark wood; bids as wooden tokens with a black dot for Cannonball; won tricks as mini face-down cards; card names under trick cards dropped except Tigress's "as Pirate/Escape"; deck at the bottom-left; score pad as a tap target at the bottom-right on phone.
 - Study "every hand" reveal is local-only (online it would leak hands).
 - The 2025 expansion pack isn't implemented (rules unsettled).
 - Sound & effects is a Settings group after "Help while playing"; the "Fast" there is animation speed, separate from Computer speed.
@@ -97,6 +105,9 @@ BID_SCALE 1.15 chosen by tuning (medium mirror avg score: 0.7 → −21, 0.85 �
 - Online with 3+ real people at once and host hand-over when the host closes the tab (online.js handles it; not exercised here).
 - 10-card hand on a laptop shorter than 800 px (checked at 1280x800 only).
 - Online lobby screen after the design pass (needs a real room; `?netlocal=1` jumps straight into a game).
+- Table animations (deal flip, turn-up, trick sliding to the winner) seen only as code and single frames; headless WebKit stalls transitions, so nobody has watched them play smoothly.
+- A 9–10 card fan at 393 px leaves each card a strip about 27–35 px wide to tap (under the 40 px guideline); not tried on a real thumb.
+- Real Skull King card size (poker size) is reasoned, not confirmed.
 - The bid "✓" renders as "√" in headless WebKit on Windows (font fallback); expected fine on iPhone.
 - Reload-with-sheet-open fix checked only via `history.state` after reload, not by pressing Back on a phone.
 

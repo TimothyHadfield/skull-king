@@ -1,5 +1,11 @@
 # Skull King: chat log
 
+## 2026-10-20: real-table look (builder agent)
+- Asked (Tim, via manager): make each game look like the real table "like you're looking through a camera ... connected to a user's glasses".
+- Built: Play screen rebuilt from your seat on the shared `_table` kit. It has a wood table, opponents' fans of backs, bid tokens, won tricks face down, the trick in front of each player, the deck, your fanned hand and a score pad. Cards deal from the deck with a 3-D flip, opponents' cards turn up and the trick slides to the winner. Landscape keeps the actions on the right. sfx.js selectors were updated for the new seats. fx.js was re-copied at 1.0.3. Assets ?v=6. No rule changes.
+- Verified: tests 37/9/5/9 pass. Scratch `table/skull-king/shots.mjs` covers 10 states (setup, bid 1, bid 10, mid trick, late trick, 8 players, 2-player ghost, game over, results, online `?netlocal=1`) at 393x659 WebKit, 1280x800, 320 and 659x393: 40/40 with no overflow and no console errors. Two read-only reviewer rounds; fixed what they found (8 names clipped at 320, the oval bid token, opponents' hands hidden in landscape, the trick ring spacing).
+- Open: animations not watched in motion; tap width on a 10-card fan.
+
 ## 2026-10-20: sounds, celebrations, animations (builder agent)
 - Asked (Tim, via manager): "add opptional sounds … win celebrations, and other fun annimations … customizable in the settings".
 - Built: `js/fx.js` (shared 1.0.1, unchanged copy) + `js/sfx.js` (state diff → sounds + animations, custom yoho/cutlass/skullKing/mermaid/kraken/whale sounds); hooks in app.js (arm on applyAction/startGame/onNetSnap, illegal-tap shake, scorekeeper ticks/count-up/confetti); "Sound & effects" Settings group; CSS so its rows match the page; `.fx-still` turns off card deal/drop when Animations is off. Assets ?v=5. No rules changes; online.js untouched.
