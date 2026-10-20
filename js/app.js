@@ -29,7 +29,7 @@
   function save() {
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
-      try { localStorage.setItem(KEY, JSON.stringify({ settings: S, score: SC, adv: { players: ADV.players, cards: ADV.cards, before: ADV.before, hand: ADV.hand, mode: ADV.mode }, play: PLAY.state && !PLAY.net ? { state: PLAY.state, seats: PLAY.seats, study: PLAY.study } : null, tab })); } catch (e) { /* storage full or blocked */ }
+      try { localStorage.setItem(KEY, JSON.stringify({ settings: S, score: SC, adv: { players: ADV.players, cards: ADV.cards, before: ADV.before, hand: ADV.hand, mode: ADV.mode }, play: PLAY.state && !PLAY.net ? { state: PLAY.state, seats: PLAY.seats, study: PLAY.study, log: (PLAY.log || []).slice(-30), roundHands: PLAY.roundHands, shown: PLAY.shownRoundSheet } : null, tab })); } catch (e) { /* storage full or blocked */ }
     }, 120);
   }
 
@@ -173,9 +173,12 @@
     const best = Math.max(...allTotals);
     const finished = scFinished(sc);
     const isTr = sc.phase === 'tricks';
+    const sumB = r.bids.reduce((a, b) => a + b, 0), sumT = r.tricks.reduce((a, b) => a + b, 0);
+    // Tricks can't add up to more than were played; fewer only if a Kraken/Whale threw one away.
+    const tricksBad = isTr && (sumT > r.cards || (sumT < r.cards && !(S.kraken || S.whale)));
     const rows = sc.players.map((name, p) => {
       const val = isTr ? r.tricks[p] : r.bids[p];
-      const step = `<div class="step sm"><button data-act="sc-step" data-p="${p}" data-d="-1" ${val <= 0 ? 'disabled' : ''} aria-label="less">−</button><span class="val">${val}</span><button data-act="sc-step" data-p="${p}" data-d="1" ${val >= r.cards ? 'disabled' : ''} aria-label="more">+</button></div>`;
+      const step = `<div class="step sm"><button data-act="sc-step" data-p="${p}" data-d="-1" ${val <= 0 ? 'disabled' : ''} aria-label="less">−</button><span class="val">${val}</span><button data-act="sc-step" data-p="${p}" data-d="1" ${val >= r.cards || (isTr && sumT >= r.cards) ? 'disabled' : ''} aria-label="more">+</button></div>`;
       const pts = scPts(sc, sc.cur, p);
       const ptsShow = isTr ? (r.done ? pts : livePts(sc, p)) : null;
       const bt = bonusTotal(r.bonus[p]) + (r.bonus[p].bet ? 1 : 0);
@@ -188,16 +191,15 @@
         <div class="sc-tot num ${allTotals[p] === best ? 'lead' : ''}">${totals[p]}</div>
       </div>`;
     }).join('');
-    const sumB = r.bids.reduce((a, b) => a + b, 0), sumT = r.tricks.reduce((a, b) => a + b, 0);
     const info = isTr
       ? `Tricks <b class="${sumT === r.cards ? '' : 'neg'}">${sumT} of ${r.cards}</b>`
       : `Bids <b>${sumB}</b> for <b>${r.cards}</b> tricks ${q('sum')}`;
     const lastRound = sc.cur === sc.rounds.length - 1;
     let primary;
     if (!isTr) primary = `<button class="btn primary" data-act="sc-phase" data-ph="tricks">Bids in</button>`;
-    else if (!lastRound) primary = `<button class="btn primary" data-act="sc-goto" data-d="1">Next</button>`;
+    else if (!lastRound) primary = `<button class="btn primary" data-act="sc-goto" data-d="1" ${tricksBad ? 'disabled' : ''}>Next</button>`;
     else if (finished) primary = `<button class="btn primary" data-act="sc-new">New game</button>`;
-    else primary = `<button class="btn primary" data-act="sc-done">${sc.rounds.length >= scPlanned(sc) ? 'Finish' : 'Next round'}</button>`;
+    else primary = `<button class="btn primary" data-act="sc-done" ${tricksBad ? 'disabled' : ''}>${sc.rounds.length >= scPlanned(sc) ? 'Finish' : 'Next round'}</button>`;
     const banner = finished ? winnerBanner(sc) : '';
     const tableHtml = scoreTableHTML(sc);
     v.innerHTML = `<div class="sc-cols">
@@ -341,8 +343,10 @@
         return true;
       }
       case 'sc-new-yes': {
-        const old = SC; SC = null; closeSheet(); scSetupNames = old.players.slice(); renderScore(); save();
-        toast('Scoresheet cleared', () => { SC = old; renderScore(); save(); });
+        const old = SC; SC = null; closeSheet();
+        scSetupNames = old.players.map((nm, i) => (nm === 'Player ' + (i + 1) ? '' : nm)); // default names stay placeholders
+        renderScore(); renderTop(); save();
+        toast('Scoresheet cleared', () => { SC = old; if (tab === 'score') { renderScore(); renderTop(); } save(); });
         return true;
       }
       case 'sc-table': openSheet(`<h3>Scoresheet</h3><div class="scroll">${scoreTableHTML(SC)}</div><div class="acts"><button class="btn" data-act="close-sheet">Close</button></div>`); sheetKind = 'table'; return true;
@@ -407,7 +411,7 @@
     v.innerHTML = `<div class="adv">
       ${seg}
       <div class="adv-ctl">${stepper('players', ADV.players, 2, 8, 'Players')}${stepper('cards', ADV.cards, 1, maxCards(ADV.players), 'Cards')}${stepper('before', ADV.before, 0, ADV.players - 1, 'Before you', 'before')}</div>
-      <div class="adv-hand" id="advHand">${slots.join('')}${ADV.hand.length ? `<button class="btn sm ghost" data-act="adv-clear" style="margin-left:auto">Clear</button>` : ''}</div>
+      <div class="adv-hand-row"><div class="adv-hand ${ADV.cards > 13 ? 'two' : ''}" id="advHand">${slots.join('')}</div>${ADV.hand.length ? `<button class="btn sm ghost" data-act="adv-clear">Clear</button>` : ''}</div>
       <div class="picker" id="picker">${pickerHTML()}</div>
       <div class="chart" id="advChart"></div>
     </div>`;
@@ -427,7 +431,8 @@
         h += `<button class="pk ${on ? 'on' : ''}" data-act="adv-pick" data-id="${id}" ${!on && full ? 'disabled' : ''} style="background:${col};color:${fg};${s === 0 ? 'border-color:#555b70' : ''}" aria-label="${SK.SUIT_NAMES[s]} ${r}">${r}</button>`;
       }
     }
-    const kinds = [['esc', 'Escape'], ['pir', 'Pirate'], ['tig', 'Tigress'], ['sk', 'Skull K.'], ['mer', 'Mermaid']];
+    h = `<div class="pk-grid">${h}</div><div class="pk-sp">`;
+    const kinds = [['esc', 'Escape'], ['pir', 'Pirate'], ['tig', 'Tigress'], ['sk', 'Skull King'], ['mer', 'Mermaid']];
     if (S.kraken) kinds.push(['kra', 'Kraken']);
     if (S.whale) kinds.push(['wha', 'Whale']);
     if (S.loot && ADV.players > 2) kinds.push(['loot', 'Loot']);
@@ -437,7 +442,7 @@
       const icon = Art && Art.kindIcon ? `<span style="width:14px;height:14px;display:inline-block">${Art.kindIcon(k)}</span>` : '';
       h += `<button class="pk pk-special ${have ? 'on' : ''}" data-act="adv-kind" data-k="${k}" ${(full || have >= ids.length) && !have ? 'disabled' : ''}>${icon}${label}${have ? `<span class="cnt">${have}</span>` : ''}</button>`;
     }
-    return h;
+    return h + '</div>';
   }
 
   function renderAdvisorResults() {
@@ -536,8 +541,10 @@
     state: saved.play ? saved.play.state : null,
     seats: saved.play ? saved.play.seats : null,
     study: saved.play ? (saved.play.study || null) : null,
+    log: (saved.play && saved.play.log) || [],
+    roundHands: (saved.play && saved.play.roundHands) || null,
+    shownRoundSheet: (saved.play && saved.play.shown) || 0,
     setup: null, gen: 0, timer: 0, me: 0, sel: null, hint: null, evalCache: null, bidCache: null, busy: false, discard: [],
-    shownRoundSheet: 0,
   };
   if (!PLAY.setup) PLAY.setup = [{ kind: 'you' }, { kind: 'cpu', level: 'medium' }, { kind: 'cpu', level: 'medium' }, { kind: 'cpu', level: 'hard' }];
   if (PLAY.state && PLAY.state.v !== 2) { PLAY.state = null; }
@@ -694,9 +701,10 @@
 
   function roundsTableHTML(st) {
     const seats = st.players.map((p, i) => i).filter(i => i !== st.ghost);
-    const head = seats.map(p => `<th>${esc(p === PLAY.me ? 'You' : st.players[p].name.slice(0, 6))}</th>`).join('');
+    const many = seats.length > 5; // 6+ players: short names so every column fits the side panel
+    const head = seats.map(p => `<th title="${esc(st.players[p].name)}">${esc(p === PLAY.me ? 'You' : st.players[p].name.slice(0, many ? 3 : 6))}</th>`).join('');
     const rows = st.history.map(h => `<tr><td>${h.round}</td>${seats.map(p => `<td><span class="bt">${h.results[p].bid}/${h.results[p].won}</span><span class="${cls(h.results[p].pts)}">${sgn(h.results[p].pts)}</span></td>`).join('')}</tr>`).join('');
-    return `<table class="grid-table"><thead><tr><th>Rd</th>${head}</tr></thead><tbody>${rows}</tbody><tfoot><tr><td>Total</td>${seats.map(p => `<td>${st.scores[p]}</td>`).join('')}</tr></tfoot></table>`;
+    return `<div class="rt-wrap ${seats.length > 5 ? 'many' : ''}"><table class="grid-table"><thead><tr><th>Rd</th>${head}</tr></thead><tbody>${rows}</tbody><tfoot><tr><td>Total</td>${seats.map(p => `<td>${st.scores[p]}</td>`).join('')}</tr></tfoot></table></div>`;
   }
 
   function resultsSheet() {
@@ -743,7 +751,7 @@
       <div class="panel net-box">
         <div class="row" style="justify-content:space-between"><div class="lbl">Play online</div>${q('online')}</div>
         <input type="text" class="net-in" data-net-name maxlength="20" placeholder="Your name" value="${esc(S.netName || '')}" aria-label="Your name" autocomplete="nickname">
-        <div class="row"><button class="btn grow" data-act="net-create">New room</button><input type="text" class="net-in code" data-net-code maxlength="5" placeholder="CODE" aria-label="Room code" autocapitalize="characters" autocomplete="off"><button class="btn" data-act="net-join">Join</button></div>
+        <div class="row"><button class="btn grow" data-act="net-create">New room</button><input type="text" class="net-in code" data-net-code maxlength="5" placeholder="CODE" value="${esc(PLAY.netCode || '')}" aria-label="Room code" autocapitalize="characters" autocomplete="off"><button class="btn" data-act="net-join">Join</button></div>
       </div>
     </div>`;
   }
@@ -752,7 +760,7 @@
   const NET_KEY = 'online.skull-king';
   let NET = null, netMod = null;
   async function netOpen() {
-    if (!netMod) netMod = await import(new URL('js/online.js?v=2', document.baseURI).href);
+    if (!netMod) netMod = await import(new URL('js/online.js?v=3', document.baseURI).href);
     if (!NET) {
       NET = netMod.createOnline({ game: window.SKGame.game, gameId: 'skull-king', botDelayMs: 700 });
       NET.on('change', onNetSnap);
@@ -779,6 +787,7 @@
   async function netJoin() {
     const name = netName(); if (!name) return;
     const code = String(($('[data-net-code]') || {}).value || '').trim().toUpperCase();
+    PLAY.netCode = code; // kept in the box if the join fails
     if (code.length !== 5) { toast('Room codes have 5 letters'); return; }
     PLAY.net = { status: 'joining' }; renderPlay();
     try {
@@ -806,7 +815,7 @@
   // ?netlocal=1: the same online screens driven by online.js's createLocal room
   // (no network). Used for scripted checks of the online code path.
   async function netLocalTest() {
-    netMod = await import(new URL('js/online.js?v=2', document.baseURI).href);
+    netMod = await import(new URL('js/online.js?v=3', document.baseURI).href);
     PLAY.net = { status: 'joining' };
     NET = netMod.createLocal({ game: window.SKGame.game, seats: ['human', 'computer', 'computer', 'computer'], names: ['Tim'],
       options: { schedule: S.schedule, opts: { kraken: S.kraken, whale: S.whale, loot: S.loot }, abilities: S.abilities, scoring: S.scoring, cannonball: S.cannonball }, botDelayMs: 300 });
@@ -816,6 +825,16 @@
   function onNetSnap(snap) {
     if (!PLAY.net) return; // left already
     if (snap.status === 'closed' || snap.status === 'left') { toast(snap.status === 'closed' ? 'The room was closed' : 'You left the room'); netReset(); return; }
+    // Names must be unique in a room (a name is how a dropped player gets their
+    // seat back): the later of two same-named players steps out again.
+    if (snap.status === 'lobby' && snap.mySeat > 0 && !snap.isHost) {
+      const nm = s => String((s && s.name) || '').trim().toLowerCase();
+      const mine = nm(snap.seats[snap.mySeat]);
+      if (mine && snap.seats.some((s, i) => i !== snap.mySeat && s.kind === 'human' && i < snap.mySeat && nm(s) === mine)) {
+        toast('Someone in that room already uses that name. Pick another.');
+        netLeave(); return;
+      }
+    }
     PLAY.net = snap; PLAY.netBusy = false;
     if ((snap.status === 'playing' || snap.status === 'finished') && snap.pub && snap.mine && snap.mySeat >= 0) {
       const prev = PLAY.state;
@@ -887,6 +906,7 @@
     const nm = p => (p === PLAY.me ? 'You' : st.players[p].name);
     const cards = lt.plays.map(pl => `${esc(nm(pl.p))} ${esc(shortName(pl.id))}`).join(', ');
     const res = lt.winner == null ? (lt.how === 'kraken' ? 'Kraken: nobody' : 'Whale: discarded') : `<b>${esc(nm(lt.winner))}</b> wins${lt.bonus ? ' +' + lt.bonus : ''}`;
+    if (!PLAY.log) PLAY.log = [];
     PLAY.log.push(`${res} · ${cards}`);
     if (PLAY.log.length > 60) PLAY.log.shift();
   }
@@ -1195,7 +1215,10 @@
 
   // ============================================================ BOOT
   if (Art) $('#brandMark').innerHTML = Art.kindIcon ? Art.kindIcon('sk') : '';
-  history.replaceState({ tab }, '');
+  // A reload while a sheet was open leaves a stale sheet entry in history: step
+  // off it so the next Back really goes back.
+  if (history.state && history.state.sheet) history.back();
+  else history.replaceState({ tab }, '');
   setTab(tab, true);
   // Back in an online room after a reload (only loads Firebase if a room was open).
   if (/[?&]netlocal=1/.test(location.search)) netLocalTest();

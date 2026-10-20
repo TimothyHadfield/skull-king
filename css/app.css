@@ -178,6 +178,10 @@ select { background: var(--bg-soft); border: 1px solid var(--line); border-radiu
 .grid-table tfoot td { font-weight: 800; color: var(--text); border-top: 2px solid var(--line); }
 .grid-table td.cur { background: rgba(240,179,84,.08); }
 .grid-table .bt { color: var(--muted); font-size: 11px; margin-right: 4px; }
+.rt-wrap { overflow-x: auto; max-width: 100%; }
+.rt-wrap.many .grid-table { font-size: 11px; }
+.rt-wrap.many .grid-table th, .rt-wrap.many .grid-table td { padding: 4px 2px; }
+.rt-wrap.many .grid-table .bt { display: none; }
 .setup-list { display: flex; flex-direction: column; gap: 8px; }
 .setup-row { display: flex; gap: 8px; align-items: center; }
 .setup-row .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
@@ -191,21 +195,29 @@ select { background: var(--bg-soft); border: 1px solid var(--line); border-radiu
 .bonus-row .t small { color: var(--muted); display: block; font-size: 11.5px; }
 
 /* --------------------------------------------------------------- advisor */
-.adv { display: grid; gap: 10px; flex: 1; min-height: 0; grid-template-rows: auto auto auto 1fr; }
+.adv { display: grid; gap: 10px; flex: 1; min-height: 0; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto 1fr; }
 .adv-ctl { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .adv-ctl .cell { display: flex; flex-direction: column; align-items: center; gap: 3px; }
 .adv-ctl .cell .lbl { font-size: 10px; }
-.adv-hand { display: flex; gap: 4px; min-height: 53px; align-items: center; flex-wrap: nowrap; overflow: hidden; }
-.adv-hand .slot { width: 30px; height: 42px; border-radius: 4px; border: 1px dashed #3a4258; flex: none; }
-.adv-hand .cardf { --cw: 30px; --ch: 42px; cursor: pointer; }
-.picker { display: grid; grid-template-columns: repeat(14, 1fr); gap: 3px; }
+.adv-hand-row { display: flex; gap: 8px; align-items: center; min-width: 0; min-height: 53px; }
+.adv-hand-row .btn { flex: none; }
+/* up to 13 cards in one row, more wrap to a second row; cards shrink to fit */
+.adv-hand { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(10, minmax(0, 30px)); gap: 4px; align-content: center; }
+.adv-hand.two { grid-template-columns: repeat(13, minmax(0, 30px)); }
+.adv-hand .slot, .adv-hand .cardf { width: 100%; height: auto; aspect-ratio: 30 / 42; }
+.adv-hand .slot { border-radius: 4px; border: 1px dashed #3a4258; }
+.adv-hand .cardf { cursor: pointer; }
+.picker { display: flex; flex-direction: column; gap: 6px; }
+.pk-grid { display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); gap: 3px; }
+.pk-sp { display: flex; flex-wrap: wrap; gap: 5px; }
+.pk-sp .pk { flex: 1 1 auto; padding: 0 8px; }
 .pk { height: 30px; border-radius: 5px; border: 1px solid transparent; font-size: 12.5px; font-weight: 800; cursor: pointer; padding: 0; position: relative; font-variant-numeric: tabular-nums; }
 .pk.on { outline: 2px solid var(--gold); outline-offset: 1px; }
 .pk:disabled { opacity: .3; cursor: default; }
-.pk-special { grid-column: span 2; font-size: 11.5px; display: flex; align-items: center; justify-content: center; gap: 2px; background: #2a3042; color: var(--text); }
+.pk-special { font-size: 12.5px; display: flex; align-items: center; justify-content: center; gap: 4px; background: #2a3042; color: var(--text); white-space: nowrap; }
 .pk .cnt { position: absolute; top: -6px; right: -4px; background: var(--gold); color: #1d1405; border-radius: 8px; font-size: 10px; padding: 0 4px; line-height: 14px; }
 .chart { display: flex; flex-direction: column; min-height: 0; }
-.bars { flex: 1; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; align-items: end; min-height: 90px; }
+.bars { flex: 1; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; overflow-x: auto; gap: 4px; align-items: end; min-height: 90px; }
 .bar { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 2px; cursor: default; }
 .bar .pct { font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .bar .fill { width: 100%; max-width: 40px; border-radius: 5px 5px 2px 2px; background: #33405e; transition: height .3s ease; min-height: 2px; }
@@ -216,10 +228,10 @@ select { background: var(--bg-soft); border: 1px solid var(--line); border-radiu
 .verdict .big { font-size: 22px; font-weight: 850; color: var(--gold); }
 @media (min-width: 900px) {
   .adv { grid-template-columns: minmax(420px, 1fr) minmax(360px, 1fr); grid-template-rows: auto auto 1fr; column-gap: 28px; }
-  .adv-ctl, .adv-hand, .picker { grid-column: 1; }
+  .adv-ctl, .adv-hand-row, .picker { grid-column: 1; }
   .chart { grid-column: 2; grid-row: 1 / span 4; }
   .pk { height: 38px; font-size: 14px; }
-  .adv-hand { min-height: 70px; } .adv-hand .cardf { --cw: 46px; --ch: 64px; } .adv-hand .slot { width: 46px; height: 64px; }
+  .adv-hand-row { min-height: 70px; } .adv-hand { grid-template-columns: repeat(10, minmax(0, 46px)); } .adv-hand.two { grid-template-columns: repeat(13, minmax(0, 46px)); }
 }
 .odds-table { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
 .odds-table th, .odds-table td { padding: 4px 3px; text-align: center; }
