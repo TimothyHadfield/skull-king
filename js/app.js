@@ -13,6 +13,7 @@
   const $ = (s, el) => (el || document).querySelector(s);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const sgn = n => (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(Math.round(n));
+  const neg = n => (n < 0 ? '−' + Math.abs(n) : String(n)); // true minus sign for totals
   const cls = n => (n > 0 ? 'pos' : n < 0 ? 'neg' : '');
   const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
   // red -> green for a 0..1 value
@@ -577,10 +578,11 @@
       const turn = SK.whoActs(st).indexOf(p) >= 0 && st.phase !== 'bid';
       let bidTxt;
       if (ghost) bidTxt = '–';
-      else if (st.phase === 'bid') bidTxt = view.bidIn[p] ? (p === me ? String(st.bids[p]) : '✓') : '…';
+      else if (st.phase === 'bid') bidTxt = view.bidIn[p] ? (p === me ? String(st.bids[p]) : '<span class="pos">✓</span>') : '…';
       else bidTxt = st.bids[p] + (st.cannon[p] ? '●' : '');
+      const sc = st.scores[p];
       return `<div class="chip ${turn ? 'turn' : ''} ${ghost ? 'ghost' : ''}"><div class="n"><span style="color:${PLAYER_COLORS[p % 8]}">●</span> ${esc(p === me ? 'You' : pl.name)}</div>
-        <div class="s"><span>${ghost ? 'won ' + st.won[p] : `<b>${st.won[p]}</b>/${bidTxt}`}</span><b class="num">${ghost ? '' : st.scores[p]}</b></div></div>`;
+        <div class="s"><span>${ghost ? 'won ' + st.won[p] : `<b>${st.won[p]}</b>/${bidTxt}`}</span><b class="num">${ghost ? '' : neg(sc)}</b></div></div>`;
     }).join('');
     // felt: current trick, or the last finished trick
     let trickHtml = '', msg = '';
@@ -616,11 +618,15 @@
     }).join('');
     PLAY.dealtRound = st.round;
     const studyLine = PLAY.study && S.study && PLAY.study.last ? `<div class="study">${PLAY.study.last}</div>` : '';
+    // Layout counts for the CSS grids: cards per hand row (one row, or two even
+    // rows when the hand is long), and one trick column per player.
+    const wide = window.innerWidth >= 900;
+    const perRow = hand.length <= (wide ? 8 : 6) ? Math.max(hand.length, 1) : Math.ceil(hand.length / 2);
     v.innerHTML = `<div class="pl">
       <div class="chips">${chips}</div>
-      <div class="felt"><div class="msg">${msg}</div><div class="trick">${trickHtml}</div></div>
+      <div class="felt ${st.phase === 'bid' ? 'bidding' : ''}"><div class="msg">${msg}</div><div class="trick ${st.players.length >= 7 ? 'many' : ''}" style="--tn:${st.players.length}">${trickHtml}</div></div>
       <div class="actions-wrap">${studyLine}<div class="actions">${actions}</div></div>
-      <div class="hand ${odds || (PLAY.hint && PLAY.hint.ev) ? 'badges' : ''}">${handHtml}</div>
+      <div class="hand ${odds || (PLAY.hint && PLAY.hint.ev) ? 'badges' : ''}" style="--per:${perRow}">${handHtml}</div>
       <div class="pl-side">${playSideHTML(st)}</div>
     </div>`;
   }
@@ -663,7 +669,9 @@
       const hintBid = PLAY.hint && PLAY.hint.bid != null ? PLAY.hint.bid : -1;
       let pad = '';
       for (let b = 0; b <= st.cards; b++) pad += `<button class="btn ${b === hintBid ? 'hint' : ''}" data-act="pl-bid" data-b="${b}">${b}</button>`;
-      return `<div class="bidpad">${pad}</div><button class="btn sm ghost" data-act="pl-hint">${PLAY.hint && PLAY.hint.bidText ? PLAY.hint.bidText : 'Hint'}</button>`;
+      const n = st.cards + 1, wide = window.innerWidth >= 900;
+      const cols = n <= (wide ? 14 : 8) ? n : Math.ceil(n / Math.ceil(n / (wide ? 14 : 8)));
+      return `<div class="bidpad" style="--bn:${cols}">${pad}</div><button class="btn sm ghost" data-act="pl-hint">${PLAY.hint && PLAY.hint.bidText ? PLAY.hint.bidText : 'Hint'}</button>`;
     }
     if (st.phase === 'cannon' && !st.cannonIn[me]) {
       return `<button class="btn" data-act="pl-cannon" data-on="0">Grapeshot</button><button class="btn primary" data-act="pl-cannon" data-on="1">Cannonball</button>${q('cannonball')}`;
@@ -704,7 +712,7 @@
     const many = seats.length > 5; // 6+ players: short names so every column fits the side panel
     const head = seats.map(p => `<th title="${esc(st.players[p].name)}">${esc(p === PLAY.me ? 'You' : st.players[p].name.slice(0, many ? 3 : 6))}</th>`).join('');
     const rows = st.history.map(h => `<tr><td>${h.round}</td>${seats.map(p => `<td><span class="bt">${h.results[p].bid}/${h.results[p].won}</span><span class="${cls(h.results[p].pts)}">${sgn(h.results[p].pts)}</span></td>`).join('')}</tr>`).join('');
-    return `<div class="rt-wrap ${seats.length > 5 ? 'many' : ''}"><table class="grid-table"><thead><tr><th>Rd</th>${head}</tr></thead><tbody>${rows}</tbody><tfoot><tr><td>Total</td>${seats.map(p => `<td>${st.scores[p]}</td>`).join('')}</tr></tfoot></table></div>`;
+    return `<div class="rt-wrap ${seats.length > 5 ? 'many' : ''}"><table class="grid-table"><thead><tr><th>Rd</th>${head}</tr></thead><tbody>${rows}</tbody><tfoot><tr><td>Total</td>${seats.map(p => `<td>${neg(st.scores[p])}</td>`).join('')}</tr></tfoot></table></div>`;
   }
 
   function resultsSheet() {
@@ -714,7 +722,7 @@
     const rows = st.players.map((pl, p) => {
       if (p === st.ghost) return '';
       const r = h.results[p];
-      return `<tr><td>${esc(p === PLAY.me ? 'You' : pl.name)}</td><td>${r.bid}${r.cannon ? '●' : ''}</td><td>${r.won}</td><td>${r.bonus ? '+' + r.bonus : ''}${r.bet ? ` <span class="${cls(r.bet)}">${sgn(r.bet)}</span>` : ''}</td><td class="${cls(r.pts)}"><b>${sgn(r.pts)}</b></td><td class="num">${st.scores[p]}</td></tr>`;
+      return `<tr><td>${esc(p === PLAY.me ? 'You' : pl.name)}</td><td>${r.bid}${r.cannon ? '●' : ''}</td><td>${r.won}</td><td>${r.bonus ? '+' + r.bonus : ''}${r.bet ? ` <span class="${cls(r.bet)}">${sgn(r.bet)}</span>` : ''}</td><td class="${cls(r.pts)}"><b>${sgn(r.pts)}</b></td><td class="num">${neg(st.scores[p])}</td></tr>`;
     }).join('');
     let reveal = '';
     if (S.study && !PLAY.net && PLAY.roundHands && PLAY.roundHands.round === h.round) {
@@ -746,7 +754,7 @@
       <div><div style="font-size:20px;font-weight:800">Play the computer</div><div class="muted" style="font-size:13px">${esc(rules.join(' · '))}</div></div>
       <div class="seat-list scroll" style="flex:0 1 auto">${seats}</div>
       <div class="row"><button class="btn grow" data-act="pl-add" ${PLAY.setup.length >= 8 ? 'disabled' : ''}>Add computer</button><button class="btn primary grow" data-act="pl-start">Deal</button></div>
-      <div class="row muted" style="font-size:12.5px;gap:6px">Easy plays by feel · Medium counts cards · Hard simulates <span style="margin-left:auto">How strong?</span> ${q('strength')}</div>
+      <div class="row muted" style="font-size:12.5px;gap:6px">Easy plays by feel · Medium counts cards · Hard simulates <span style="margin-left:auto;white-space:nowrap">How strong?</span> ${q('strength')}</div>
       ${PLAY.setup.length === 2 && S.ghost ? `<div class="muted" style="font-size:12.5px">Two players: Graybeard's ghost hand joins. ${q('ghost')}</div>` : ''}
       <div class="panel net-box">
         <div class="row" style="justify-content:space-between"><div class="lbl">Play online</div>${q('online')}</div>
