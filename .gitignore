@@ -1,0 +1,4 @@
+# Local test credentials / browser state (never commit)
+.claude/test/
+node_modules/
+shots/
