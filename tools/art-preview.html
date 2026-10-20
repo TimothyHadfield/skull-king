@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Card Art Preview</title>
+<style>
+  :root { --bg:#0f1117; --panel:#1a1e2b; --line:#2a3042; --text:#e8eaf0; --muted:#969db4; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:16px; background:var(--bg); color:var(--text); font:14px system-ui,-apple-system,Segoe UI,sans-serif; }
+  h1 { font-size:18px; margin:0 0 4px; }
+  h2 { font-size:14px; color:var(--muted); font-weight:600; margin:18px 0 8px; }
+  .grid { display:flex; flex-wrap:wrap; gap:8px; }
+  .big svg { width:100px; height:140px; display:block; }
+  .small { gap:4px; }
+  .small svg { width:40px; height:56px; display:block; }
+  .fan { display:flex; padding-left:22px; }
+  .fan svg { width:40px; height:56px; margin-left:-22px; filter:drop-shadow(-1px 0 1px rgba(0,0,0,.5)); }
+  .icons { display:flex; gap:10px; align-items:center; color:var(--text); background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:8px; flex-wrap:wrap; }
+  .icons svg { width:24px; height:24px; }
+  .light { background:#f4f4f6; color:#1a1e2b; }
+</style>
+</head>
+<body>
+<h1>Card art preview</h1>
+<h2>Icons (dark and light)</h2>
+<div class="icons" id="icons"></div>
+<div class="icons light" id="icons2" style="margin-top:6px"></div>
+<h2>Fanned hand, 40 x 56</h2>
+<div class="fan" id="fan"></div>
+<h2>All 74 faces + back, 40 x 56</h2>
+<div class="grid small" id="small"></div>
+<h2>All 74 faces + back, 100 x 140</h2>
+<div class="grid big" id="big"></div>
+<script src="../js/art.js"></script>
+<script>
+  var A = window.SKArt, all = '';
+  for (var i = 0; i < 74; i++) all += A.face(i);
+  all += A.back();
+  document.getElementById('small').innerHTML = all;
+  document.getElementById('big').innerHTML = all;
+  document.getElementById('fan').innerHTML = [3, 17, 30, 44, 13, 56, 61, 66, 67, 68, 70, 71, 72].map(function (id) { return A.face(id); }).join('');
+  var ic = '';
+  for (var s = 0; s < 4; s++) ic += A.suitIcon(s);
+  ['num', 'esc', 'pir', 'tig', 'sk', 'mer', 'kra', 'wha', 'loot'].forEach(function (k) { ic += A.kindIcon(k); });
+  document.getElementById('icons').innerHTML = ic;
+  document.getElementById('icons2').innerHTML = ic;
+</script>
+</body>
+</html>
