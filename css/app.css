@@ -241,51 +241,144 @@ select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .odds-table th:first-child, .odds-table td:first-child { text-align: left; white-space: nowrap; }
 .odds-table td.h { border-radius: 4px; font-weight: 750; color: #0b0d13; }
 
-/* ------------------------------------------------------------------ play */
-.pl { display: grid; gap: 8px; flex: 1; min-height: 0; grid-template-rows: auto 1fr auto auto; --tw: 60px; --hw: 64px; }
-.chips { display: grid; grid-template-columns: repeat(auto-fit, minmax(76px, 1fr)); gap: 5px; }
-.chip { background: var(--card); border: 1px solid var(--line); border-radius: 9px; padding: 4px 7px; min-width: 0; transition: border-color .2s, background .2s; }
-.chip.turn { border-color: var(--gold); background: #231f17; box-shadow: 0 0 0 1px var(--gold), 0 0 14px rgba(240,179,84,.25); }
-.chip .n { font-size: 12px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chip .s { display: flex; justify-content: space-between; font-size: 13px; font-variant-numeric: tabular-nums; color: #aab3c8; }
-.chip .s b { color: var(--text); }
-.chip.ghost { opacity: .6; }
-.felt { background: radial-gradient(ellipse at 50% 40%, #173a52, var(--sea) 55%, var(--sea2)); border: 1px solid #1f4660; border-radius: 16px; position: relative; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px; overflow: hidden; }
-.felt .msg { font-size: 16.5px; font-weight: 750; text-align: center; min-height: 20px; color: #e3f0fa; line-height: 1.25; }
-.felt .msg small { display: block; font-weight: 500; color: #8fb3cc; font-size: 13px; margin-top: 2px; }
-/* one column per player; cards shrink to fit 8 players on a phone */
-.trick { display: flex; justify-content: center; gap: 6px; margin: 10px 0 0; width: 100%; min-height: calc(var(--tw) * 1.4 + 18px); align-items: flex-start; }
-.tcard { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; flex: 0 0 min(var(--tw), calc((100% - (var(--tn, 4) - 1) * 6px) / var(--tn, 4))); }
-.tcard .cardf { width: 100%; height: auto; aspect-ratio: 5 / 7; }
-.tcard .who { font-size: 11.5px; font-weight: 600; color: #a9c6da; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tcard.win .cardf { box-shadow: 0 0 0 2px var(--gold), 0 0 22px rgba(240,179,84,.55); transform: translateY(-4px); }
-.tcard.win .who { color: var(--gold); }
-.trick.many .who { font-size: 10px; }
-.felt.bidding .trick { min-height: 0; margin: 0; }
+/* ------------------------------------------------------------------ play: the table from your seat
+   Surfaces, card backs, decks, seats and tokens come from css/table.css (shared kit). */
+#v-play { padding: 8px 8px 6px; }
+.pl { display: grid; gap: 8px; flex: 1; min-height: 0; grid-template-rows: 1fr; grid-template-columns: minmax(0, 1fr); --tw: 60px; --hw: 76px; --msgh: 42px; --bw: 22px; --mw: 12px; }
+.table { display: grid; grid-template-rows: auto 1fr auto auto; grid-template-columns: minmax(0, 1fr); min-height: 0; min-width: 0; border-radius: 18px; overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.55), inset 0 0 0 3px rgba(255,214,150,.07), inset 0 0 40px rgba(0,0,0,.45), 0 4px 18px rgba(0,0,0,.5); }
+.table .tbl-back.sk-back { background: var(--skback) center / 100% 100% no-repeat; border: 0; border-radius: calc(var(--card-w) * .08);
+  box-shadow: var(--tbl-stack, 0 1px 1px rgba(0,0,0,.35), 0 2px 4px rgba(0,0,0,.3)); }
+.table .tbl-back.sk-back::after { border-radius: inherit; }
+/* our SVG faces already draw the card edge: the kit adds the paper sheen and shadow */
+.table .cardf.tbl-card { --ratio: 5 / 7; width: var(--card-w); height: auto; opacity: 1; background: none; border: 0; border-radius: calc(var(--card-w) * .08); }
+.table .cardf.tbl-card svg { border-radius: inherit; }
+
+/* opponents round the far side */
+.opps.tbl-seats { gap: 4px; padding: 6px 6px 0; align-items: flex-start; }
+.table .tbl-plate { display: flex; align-items: center; gap: 4px; padding: 2px 7px; font-size: 12px; line-height: 17px; min-width: 0; max-width: 100%; }
+.tbl-plate .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; box-shadow: 0 0 0 1px rgba(0,0,0,.5); }
+.tbl-plate .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.tbl-plate .num { font-variant-numeric: tabular-nums; color: #f3d48a; margin-left: 2px; }
+.mine.is-turn .tbl-plate { border-color: #f0c35a; box-shadow: 0 0 0 2px rgba(240,195,90,.45), 0 2px 4px rgba(0,0,0,.4); }
+.seatbox.ghost .tbl-plate { opacity: .75; }
+.held { width: 100%; min-width: 0; display: flex; justify-content: center; min-height: 6px; }
+.ofan { --card-w: var(--bw); width: min(100%, calc(var(--bw) * 4.2)); }
+.gpile { --card-w: calc(var(--bw) + 4px); margin: 4px 0 2px; }
+.lay { display: flex; align-items: center; justify-content: center; gap: 5px; min-height: 22px; }
+.won { display: inline-flex; align-items: center; padding: 0 2px; }
+.won > .tbl-card { --card-w: var(--mw); flex: none; rotate: -4deg; }
+.won > .tbl-card + .tbl-card { margin-left: calc(var(--mw) * -.62); }
+.won > .tbl-card:nth-child(even) { rotate: 5deg; translate: 0 1px; }
+.won[data-won="0"] { display: none; }
+.bidtok { --tok-size: 22px; position: relative; }
+.bidtok.nobid { color: transparent; opacity: .55; }
+.bidtok .cb { position: absolute; right: -3px; top: -3px; width: 9px; height: 9px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #777, #111 70%); box-shadow: 0 1px 2px rgba(0,0,0,.6); }
+.table.many .opps .tbl-plate { flex-direction: column; gap: 0; padding: 1px 4px; font-size: 10.5px; line-height: 13px; }
+.table.many .opps .tbl-plate { align-items: stretch; text-align: center; }
+.table.many .opps .tbl-plate .dot { display: none; }
+.table.many .opps .tbl-plate .num { margin: 0; }
+.table.many { --bw: 14px; --mw: 9px; --tw: 44px; }
+.table.many .opps .bidtok { --tok-size: 19px; }
+
+/* the middle: the trick, each card in front of whoever played it */
+.mid { position: relative; min-height: 0; }
+.mid .msg { position: absolute; left: 50px; right: 50px; top: 4px; z-index: 3; text-align: center; font-size: 14px; font-weight: 750; line-height: 1.2; color: #f6ecd6; text-shadow: 0 1px 2px rgba(0,0,0,.7); pointer-events: none; }
+.mid .msg small { display: block; font-weight: 500; font-size: 12.5px; color: #e2cfa6; margin-top: 1px; }
+.mid.bidding .msg { top: 50%; transform: translateY(-50%); font-size: 17px; }
+.mid.bidding .msg small { font-size: 13.5px; }
+.trick { position: absolute; inset: 0; z-index: 2; }
+.tcard { position: absolute; left: var(--ax); top: calc(var(--msgh) + (100% - var(--msgh)) * var(--ay) / 100); width: var(--tw); --card-w: var(--tw);
+  transform: translate(-50%, -50%) translate(var(--jx, 0), var(--jy, 0)) rotate(var(--r, 0deg)); }
+.tcard .cardf { width: 100%; }
+.tcard.win .cardf { box-shadow: 0 0 0 2px #f0c35a, 0 0 18px rgba(240,195,90,.6), 0 8px 14px rgba(0,0,0,.45); transform: translateY(-4px) scale(1.04); }
+.tcard .as { position: absolute; left: 50%; bottom: -15px; transform: translateX(-50%); font-size: 10px; font-weight: 750; padding: 0 5px; border-radius: 6px; background: rgba(20,12,4,.8); color: #f3e6c8; white-space: nowrap; }
+.deckspot { position: absolute; left: 12px; bottom: 12px; z-index: 1; --card-w: 34px; }
+.pad { position: absolute; right: 10px; bottom: 8px; z-index: 1; width: 40px; height: 50px; padding: 0; border: 0; border-radius: 3px; cursor: pointer;
+  background: repeating-linear-gradient(#f4ecd8 0 7px, #9fb6c9 7px 8px) 0 12px / 100% calc(100% - 12px) no-repeat, #f4ecd8;
+  box-shadow: inset 0 9px 0 #7a2a22, inset 0 10px 0 rgba(0,0,0,.25), 1px 2px 0 #d8cfb9, 2px 4px 0 #c2b89f, 3px 6px 8px rgba(0,0,0,.45); }
+.pad i { position: absolute; left: 7px; right: 7px; top: 16px; bottom: 7px; background: linear-gradient(90deg, transparent 45%, rgba(122,42,34,.55) 45% 50%, transparent 50%); }
+.pad:active { scale: .96; }
+
+/* actions and your place */
+.actions-wrap { position: relative; z-index: 3; padding: 0 8px 2px; }
 .actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; min-height: 44px; align-items: center; }
+.actions .muted { color: #e2cfa6; }
 .bidpad { display: grid; grid-template-columns: repeat(var(--bn, 6), minmax(0, 60px)); justify-content: center; gap: 6px; width: 100%; }
 .bidpad .btn { padding: 0; height: 44px; font-size: 18px; font-weight: 800; }
 .bidpad .btn.hint { box-shadow: 0 0 0 2px var(--good); border-color: var(--good); }
-/* hand: one row, or two even rows for long hands; cards as big as fit */
-.hand { display: grid; grid-template-columns: repeat(var(--per, 6), minmax(0, var(--hw))); justify-content: center; gap: 8px 6px; padding-top: 12px; padding-bottom: 6px; min-height: calc(var(--hw) * 1.4 + 18px); }
-.hand .cardf { width: 100%; height: auto; aspect-ratio: 5 / 7; }
-.hand.badges { row-gap: 22px; padding-bottom: 20px; }
-.hand .cardf.dim { opacity: .5; filter: saturate(.35) brightness(.75); }
-@media (hover: hover) { .hand .cardf.can:hover:not(.sel) { transform: translateY(-6px); box-shadow: 0 10px 18px rgba(0,0,0,.5); } }
-.hand .cardf.can:active { transform: translateY(-3px) scale(.97); }
-.study { font-size: 13px; color: var(--muted); text-align: center; min-height: 18px; }
-.study b { color: var(--text); }
+.mine { position: relative; z-index: 2; padding: 0 6px 8px; }
+.mine > .lay { gap: 8px; min-height: 26px; }
+.hand.tbl-fan { --card-w: var(--hw); margin: 2px 0 0; }
+.hand.badges { margin-top: 16px; }
+.hand > .cardf { cursor: default; }
+.hand > .cardf.can { cursor: pointer; }
+.hand > .cardf.dim { filter: saturate(.35) brightness(.62); }
+.hand > .cardf.best { box-shadow: 0 0 0 2px var(--good), 0 8px 16px rgba(0,0,0,.5); }
+.hand > .cardf.sel { box-shadow: 0 0 0 2px #f0c35a, 0 12px 22px rgba(0,0,0,.5); }
+@media (hover: hover) { .hand > .cardf.can:hover:not(.is-up) { --up: 9px; } }
+.hand > .cardf .badge { position: absolute; left: 1px; top: -17px; bottom: auto; transform: none; font-size: 10.5px; font-weight: 800; padding: 0 4px; border-radius: 6px; background: rgba(12,8,4,.88); border: 1px solid rgba(255,220,160,.25); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.study { font-size: 13px; color: #e2cfa6; text-align: center; min-height: 18px; }
+.study b { color: #fff6e2; }
 .pl-side { display: none; }
+.padsheet { display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow: auto; max-height: 64dvh; }
+
+/* physical motion: dealt from the deck and turned over; opponents' cards turn face up as they land */
+@keyframes dealFly { 0% { translate: var(--dx, 0) var(--dy, 60px); scale: .55 .55; } 48% { scale: .03 .8; } 100% { translate: 0 0; scale: 1 1; } }
+@keyframes backOff { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+@keyframes turnUp { 0% { scale: 1 1; } 48% { scale: .03 1; } 100% { scale: 1 1; } }
+.hand > .cardf.deal { animation: dealFly .52s cubic-bezier(.3,.7,.3,1) both; }
+.hand > .cardf.deal::before, .tcard.turnin .cardf::before { content: ""; position: absolute; inset: 0; z-index: 2; border-radius: inherit; background: var(--skback) center / 100% 100% no-repeat; animation: backOff .52s linear both; animation-delay: inherit; pointer-events: none; }
+.tcard.turnin .cardf { animation: turnUp .36s ease-in-out both; }
+.tcard.turnin .cardf::before { animation-duration: .36s; }
+.tcard.turnin .cardf.drop { animation: dropIn .26s ease-out both, turnUp .36s ease-in-out both; }
+
 @media (min-width: 900px) {
-  .pl { grid-template-columns: 1fr 300px; grid-template-rows: auto 1fr auto auto; column-gap: 24px; }
-  .pl > .chips, .pl > .felt, .pl > .actions-wrap, .pl > .hand { grid-column: 1; }
-  .pl-side { display: flex; flex-direction: column; gap: 12px; grid-column: 2; grid-row: 1 / span 4; min-height: 0; }
-  .chips { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
-  .chip .n { font-size: 13.5px; } .chip .s { font-size: 13px; }
+  #v-play { padding: 14px 20px; }
+  .pl { grid-template-columns: minmax(0, 1fr) 290px; column-gap: 18px; --msgh: 56px; --tw: 92px; --hw: 100px; --bw: 34px; --mw: 16px; }
+  .table.many { --bw: 20px; --mw: 13px; --tw: 70px; }
+  .table { grid-column: 1; border-radius: 26px; }
+  .pl-side { display: flex; flex-direction: column; gap: 12px; grid-column: 2; min-height: 0; }
+  .opps.tbl-seats { padding: 12px 18px 0; }
+  .opps .tbl-seat { margin-top: calc(var(--d2, 0) * 64px); }
+  .table .tbl-plate { font-size: 13.5px; line-height: 19px; padding: 2px 9px; }
+  .table.many .opps .tbl-plate { font-size: 12px; line-height: 15px; }
+  .bidtok { --tok-size: 28px; }
+  .table.many .opps .bidtok { --tok-size: 24px; }
+  .mid .msg { font-size: 17px; top: 8px; } .mid .msg small { font-size: 14px; }
+  .mid.bidding .msg { font-size: 21px; } .mid.bidding .msg small { font-size: 15px; }
+  .deckspot { --card-w: 50px; left: 22px; bottom: 18px; }
+  .pad { display: none; }
   .bidpad { grid-template-columns: repeat(var(--bn, 11), minmax(0, 56px)); }
-  .pl { --cw: 84px; --ch: 118px; --tw: 92px; --hw: 88px; }
-  .felt .msg { font-size: 19px; } .felt .msg small { font-size: 14.5px; }
-  .tcard .who { font-size: 13px; }
+  .tcard .as { font-size: 11.5px; bottom: -18px; }
+  .mine { padding: 0 18px 12px; }
+}
+/* short screens (phone on its side, small phones) */
+@media (max-height: 600px) and (max-width: 899px) {
+  .pl { --tw: 44px; --hw: 54px; --bw: 13px; --mw: 9px; }
+  .bidtok { --tok-size: 19px; }
+  .mid .msg { font-size: 13px; } .mid .msg small { font-size: 11.5px; }
+  .deckspot { --card-w: 26px; }
+  .pad { width: 32px; height: 40px; }
+}
+@media (max-height: 460px) and (max-width: 899px) {
+  .pl { --tw: 36px; --hw: 46px; }
+  .held { min-height: 0; }
+  .opps.tbl-seats { padding-top: 4px; }
+  .lay { min-height: 20px; }
+  .mine > .lay { min-height: 22px; }
+  /* phone on its side: the actions move to the right edge so the trick keeps the middle */
+  .table { grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto 1fr auto; }
+  .opps.tbl-seats { grid-column: 1 / -1; }
+  .mid { grid-column: 1; grid-row: 2; }
+  .mine { grid-column: 1; grid-row: 3; }
+  .actions-wrap { grid-column: 2; grid-row: 2 / 4; align-self: center; padding: 0 10px 0 0; }
+  .actions { flex-direction: column; flex-wrap: nowrap; }
+  .bidpad { grid-template-columns: repeat(4, 40px); gap: 5px; }
+  .bidpad .btn { height: 36px; font-size: 16px; }
+  .pad { right: 6px; }
+  .pl { --msgh: 18px; }
+  .mid:not(.bidding) .msg { top: 100%; left: 4px; right: auto; width: 27%; text-align: left; font-size: 12.5px; }
 }
 .log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
 .log li { color: var(--muted); }
@@ -337,4 +430,6 @@ a { color: var(--accent); }
 .set .fx-set .fx-test { height: 32px; padding: 0 12px; cursor: pointer; }
 .set .fx-set .fx-why { padding: 0 14px 8px; }
 /* Animations off: the card deal and drop are instant too */
-.fx-still .cardf.deal, .fx-still .cardf.drop { animation: none; }
+.fx-still .cardf.deal, .fx-still .cardf.drop, .fx-still .tcard.turnin .cardf { animation: none; }
+.fx-still .cardf.deal::before, .fx-still .tcard.turnin .cardf::before { display: none; }
+@media (prefers-reduced-motion: reduce) { .hand > .cardf.deal, .tcard.turnin .cardf { animation: none; } .hand > .cardf.deal::before, .tcard.turnin .cardf::before { display: none; } }

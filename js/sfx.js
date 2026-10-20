@@ -170,7 +170,8 @@
 
   // ---- DOM helpers (all transforms/opacity; missing elements are skipped)
   const q = (sel) => { const r = env && env.root && env.root(); return r ? Array.from(r.querySelectorAll(sel)) : []; };
-  const chip = p => q('.chips .chip')[p] || null;
+  // a player's place at the table (their seat, or the old score chip)
+  const chip = p => q('.seatbox[data-seat="' + p + '"]')[0] || q('.chips .chip')[p] || null;
   function anim(fn) { if (!animOn()) return; stats.anims++; try { fn(); } catch (e) { /* never break the game */ } }
   function flyIn(el, from, delay) {
     if (!el || !from || !el.animate) return;
@@ -204,7 +205,7 @@
       } else if (e.type === 'reveal') {
         at(t + 120, () => play('yoho'));
         const t0 = t + 120;
-        anim(() => q('.chips .chip .s span').forEach((el, i) => at(t0 + Math.min(i, 2) * 270, () => F.pop(el))));
+        anim(() => q('.bidtok, .chips .chip .s span').forEach((el, i) => at(t0 + Math.min(i, 2) * 270, () => F.pop(el))));
         t += 900;
       } else if (e.type === 'cannonReveal') {
         if (e.any) at(t, () => play('hit', { vol: 0.8 }));

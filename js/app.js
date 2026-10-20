@@ -605,69 +605,165 @@
   ];
   const STRENGTH_NOTE = 'Whole 10-round games, 4 players. A fair share is 25%.';
 
+  // The Play tab is a table seen from your seat: opponents round the far side
+  // (hands of card backs, won tricks face down, bid token), the trick in the
+  // middle with each card in front of the player who played it, the undealt
+  // deck, and your own hand fanned at the bottom. Uses js/table.js (shared kit).
+  const TBL = window.TABLE || null;
+  let tableFans = [];
+  function unmountTable() { tableFans.forEach(f => { try { if (f && f.disconnect) f.disconnect(); } catch (e) { /* gone */ } }); tableFans = []; }
+  // Where a player's trick card lands in the middle (percent of the middle box).
+  function trickAnchor(p, st, me) {
+    const n = st.players.length;
+    if (p === me) return { x: 50, y: 62, r: 0 };
+    const k = n - 1, i = ((p - me + n) % n) - 1;          // 0 = the player on your left
+    const sx = ((i + 0.5) / k) * 100;                      // their seat across the strip
+    const x = 50 + (sx - 50) * (k > 4 ? 0.8 : 0.72);
+    const d = Math.abs(x - 50) / 50;
+    return { x, y: 26 + 20 * d * d, r: (x - 50) * 0.12 };
+  }
+  function bidTokenHTML(st, view, p, me) {
+    if (p === st.ghost) return '';
+    let t;
+    if (st.phase === 'bid') t = view.bidIn[p] ? (p === me ? String(st.bids[p]) : '✓') : '';
+    else t = String(st.bids[p]);
+    const cannon = st.phase !== 'bid' && st.cannon && st.cannon[p] ? '<i class="cb" title="Cannonball"></i>' : '';
+    return `<span class="tbl-token bidtok ${t ? '' : 'nobid'}" title="Bid">${t || '?'}${cannon}</span>`;
+  }
+  function tricksHTML(n) {
+    let h = '';
+    for (let j = 0; j < n; j++) h += `<i class="tbl-card tbl-back sk-back" style="--j:${j}"></i>`;
+    return `<span class="won" data-won="${n}" title="${n} trick${n === 1 ? '' : 's'} won">${h}</span>`;
+  }
+  function plateHTML(st, p, me) {
+    const nm = p === me ? 'You' : st.players[p].name;
+    return `<div class="tbl-plate"><span class="dot" style="background:${PLAYER_COLORS[p % 8]}"></span><span class="nm">${esc(nm)}</span>${p === st.ghost ? '' : `<b class="num">${neg(st.scores[p])}</b>`}</div>`;
+  }
+
   function renderPlay() {
     const v = $('#v-play');
-    if (!PLAY.state) { v.innerHTML = PLAY.net ? lobbyHTML() : playSetupHTML(); return; }
+    const prevKey = PLAY.trickKey, prevWin = PLAY.trickWin;
+    if (!PLAY.state) { unmountTable(); PLAY.trickKey = null; v.innerHTML = PLAY.net ? lobbyHTML() : playSetupHTML(); return; }
     const st = PLAY.state, me = PLAY.me;
     const view = SK.view(st, me);
-    const names = st.players.map(p => p.name);
-    // chips
-    const chips = st.players.map((pl, p) => {
-      const ghost = p === st.ghost;
-      const turn = SK.whoActs(st).indexOf(p) >= 0 && st.phase !== 'bid';
-      let bidTxt;
-      if (ghost) bidTxt = '–';
-      else if (st.phase === 'bid') bidTxt = view.bidIn[p] ? (p === me ? String(st.bids[p]) : '<span class="pos">✓</span>') : '…';
-      else bidTxt = st.bids[p] + (st.cannon[p] ? '●' : '');
-      const sc = st.scores[p];
-      return `<div class="chip ${turn ? 'turn' : ''} ${ghost ? 'ghost' : ''}"><div class="n"><span style="color:${PLAYER_COLORS[p % 8]}">●</span> ${esc(p === me ? 'You' : pl.name)}</div>
-        <div class="s"><span>${ghost ? 'won ' + st.won[p] : `<b>${st.won[p]}</b>/${bidTxt}`}</span><b class="num">${ghost ? '' : neg(sc)}</b></div></div>`;
-    }).join('');
+    const n = st.players.length;
+    const acting = SK.whoActs(st);
+    const counts = view.handCounts || st.hands.map(h => h.length);
     // felt: current trick, or the last finished trick
-    let trickHtml = '', msg = '';
     const showing = st.trick.length ? st.trick : (st.lastTrick && st.phase !== 'bid' ? st.lastTrick.plays : []);
     const winnerP = !st.trick.length && st.lastTrick && st.phase !== 'bid' ? st.lastTrick.winner : null;
+    // A finished trick that leaves the table is gathered to its winner's pile.
+    const key = st.trick.length ? `c${st.round}:${st.tricksDone}` : (showing.length ? `l${st.round}:${st.tricksDone}` : `e${st.round}`);
+    if (prevKey && prevKey[0] === 'l' && prevKey !== key && prevWin != null && tab === 'play' && !document.hidden && window.FX && FX.flyTo) {
+      const to = v.querySelector(`.seatbox[data-seat="${prevWin}"] .won`) || v.querySelector(`.seatbox[data-seat="${prevWin}"]`);
+      if (to) v.querySelectorAll('.trick .tcard .cardf').forEach(c => { FX.flyTo(c, to, { duration: 380, scale: 0.3, fade: true }); });
+    }
+    PLAY.trickKey = key; PLAY.trickWin = winnerP;
+    unmountTable();
+
     const fresh = PLAY.lastSeq !== st.seq; // only animate a card the first time it lands
     PLAY.lastSeq = st.seq;
-    trickHtml = showing.map((pl, i) => {
+    const trickHtml = showing.map((pl, i) => {
       const isNew = fresh && st.trick.length && i === st.trick.length - 1;
-      const asTxt = CARDS[pl.id].k === 'tig' ? (pl.as === 'esc' ? ' · esc' : ' · pirate') : '';
-      return `<div class="tcard ${winnerP === pl.p ? 'win' : ''}">${face(pl.id, '', isNew ? 'drop' : '')}<span class="who">${esc(pl.p === me ? 'You' : names[pl.p])}${asTxt}</span></div>`;
+      const a = trickAnchor(pl.p, st, me);
+      const j = TBL ? TBL.jitter('t' + st.round + ':' + st.tricksDone, i, { rot: 10, off: 6 }) : { x: 0, y: 0, r: 0 };
+      const tig = CARDS[pl.id].k === 'tig' ? `<span class="as">${pl.as === 'esc' ? 'Escape' : 'Pirate'}</span>` : '';
+      return `<div class="tcard ${winnerP === pl.p ? 'win' : ''} ${isNew && pl.p !== me ? 'turnin' : ''}" style="--ax:${a.x.toFixed(1)}%;--ay:${a.y.toFixed(1)};--jx:${j.x}px;--jy:${j.y}px;--r:${(a.r + j.r).toFixed(1)}deg">${face(pl.id, '', 'tbl-card' + (isNew ? ' drop' : ''))}${tig}</div>`;
     }).join('');
-    msg = playMessage(st, view);
-    // actions
+    const msg = playMessage(st, view);
     const actions = playActionsHTML(st, view);
-    // hand
+
+    // opponents, left to right in play order from your left
+    const opps = [];
+    for (let k = 1; k < n; k++) {
+      const p = (me + k) % n;
+      const turn = acting.indexOf(p) >= 0 && st.phase !== 'bid';
+      const ghost = p === st.ghost;
+      const d = Math.abs((k - 0.5) / (n - 1) - 0.5) * 2; // 0 across from you, 1 at your sides
+      opps.push(`<div class="tbl-seat seatbox ${turn ? 'is-turn' : ''} ${ghost ? 'ghost' : ''}" data-seat="${p}" style="--d2:${(d * d).toFixed(2)}">
+        ${plateHTML(st, p, me)}
+        <div class="held">${ghost ? `<div class="gpile" data-deck="${counts[p]}"></div>` : `<div class="ofan" data-fan="${counts[p]}"></div>`}</div>
+        <div class="lay">${tricksHTML(st.won[p])}${bidTokenHTML(st, view, p, me)}</div>
+      </div>`);
+    }
+
+    // your hand
     const hand = view.hands[me] || [];
     const myTurn = st.phase === 'play' && st.turn === me;
     const legal = myTurn ? SK.legalPlays(st, me) : [];
     let odds = null;
     if (myTurn && S.odds && !(PLAY.hint && PLAY.hint.ev)) odds = AI.cardOdds(view, me);
     const discardMode = st.phase === 'ability' && st.pending && st.pending.seat === me && st.pending.ability === 'bendt';
-    const handHtml = hand.map(id => {
+    const dealing = st.round !== PLAY.dealtRound;
+    const handCards = hand.map(id => {
       const can = myTurn ? legal.indexOf(id) >= 0 : discardMode;
-      let extra = can ? 'can' : (myTurn ? 'dim' : '');
-      if (PLAY.sel === id || (discardMode && PLAY.discard.indexOf(id) >= 0)) extra += ' sel';
+      let extra = 'tbl-card ' + (can ? 'can' : (myTurn ? 'dim' : ''));
+      if (PLAY.sel === id || (discardMode && PLAY.discard.indexOf(id) >= 0)) extra += ' sel is-up';
       if (PLAY.hint && PLAY.hint.best === id) extra += ' best';
-      if (st.round !== PLAY.dealtRound) extra += ' deal';
+      if (dealing) extra += ' deal';
       let badge = '';
       if (PLAY.hint && PLAY.hint.ev && PLAY.hint.ev[id] != null) badge = `<span class="badge" style="color:${heat(PLAY.hint.t[id])}">${sgn(PLAY.hint.ev[id])}</span>`;
       else if (odds && odds[id] != null) badge = `<span class="badge" style="color:${heat(odds[id])}">${Math.round(odds[id] * 100)}%</span>`;
       return face(id, '', extra).replace('</div>', badge + '</div>').replace('class="cardf', `data-act="${discardMode ? 'pl-discard' : 'pl-card'}" class="cardf`);
-    }).join('');
+    });
     PLAY.dealtRound = st.round;
     const studyLine = PLAY.study && S.study && PLAY.study.last ? `<div class="study">${PLAY.study.last}</div>` : '';
-    // Layout counts for the CSS grids: cards per hand row (one row, or two even
-    // rows when the hand is long), and one trick column per player.
-    const wide = window.innerWidth >= 900;
-    const perRow = hand.length <= (wide ? 8 : 6) ? Math.max(hand.length, 1) : Math.ceil(hand.length / 2);
+    const meTurn = acting.indexOf(me) >= 0 && st.phase !== 'bid';
+    const k = n - 1;
     v.innerHTML = `<div class="pl">
-      <div class="chips">${chips}</div>
-      <div class="felt ${st.phase === 'bid' ? 'bidding' : ''}"><div class="msg">${msg}</div><div class="trick ${st.players.length >= 7 ? 'many' : ''}" style="--tn:${st.players.length}">${trickHtml}</div></div>
-      <div class="actions-wrap">${studyLine}<div class="actions">${actions}</div></div>
-      <div class="hand ${odds || (PLAY.hint && PLAY.hint.ev) ? 'badges' : ''}" style="--per:${perRow}">${handHtml}</div>
+      <div class="table tbl-surface tbl-wood-dark ${k > 4 ? 'many' : ''} ${k > 2 ? 'k3' : ''}" style="--k:${k}">
+        <div class="opps tbl-seats">${opps.join('')}</div>
+        <div class="mid ${st.phase === 'bid' ? 'bidding' : ''}">
+          <div class="msg">${msg}</div>
+          <div class="deckspot" data-deck="${view.undealtCount != null ? view.undealtCount : 0}" title="Undealt cards"></div>
+          <div class="trick" style="--tn:${n}">${trickHtml}</div>
+          <button class="pad" data-act="pl-pad" aria-label="Score pad"><i></i></button>
+        </div>
+        <div class="actions-wrap">${studyLine}<div class="actions">${actions}</div></div>
+        <div class="mine seatbox ${meTurn ? 'is-turn' : ''}" data-seat="${me}">
+          <div class="lay">${plateHTML(st, me, me)}${bidTokenHTML(st, view, me, me)}${tricksHTML(st.won[me])}</div>
+          <div class="hand ${odds || (PLAY.hint && PLAY.hint.ev) ? 'badges' : ''}" data-n="${hand.length}"></div>
+        </div>
+      </div>
       <div class="pl-side">${playSideHTML(st)}</div>
     </div>`;
+    mountTable(v, handCards, dealing);
+  }
+
+  function mountTable(v, handCards, dealing) {
+    if (!TBL) { const h = v.querySelector('.hand'); if (h) h.innerHTML = handCards.join(''); return; }
+    const backHTML = '<div class="tbl-card tbl-back sk-back"></div>';
+    // Cards are rebuilt on every render: place them without sliding in from the corner.
+    const table = v.querySelector('.table');
+    if (table) {
+      table.classList.add('tbl-instant');
+      requestAnimationFrame(() => requestAnimationFrame(() => table.classList.remove('tbl-instant')));
+    }
+    v.querySelectorAll('.ofan').forEach(el => {
+      const c = +el.dataset.fan;
+      tableFans.push(TBL.fan(el, Array.from({ length: c }, () => backHTML), { backs: true, across: true, spread: 0.32, arc: 0.7, maxRot: 12 }));
+    });
+    v.querySelectorAll('.gpile, .deckspot').forEach(el => TBL.deck(el, +el.dataset.deck, { cls: 'sk-back', badge: false, perCard: 0.2, max: 10 }));
+    const handEl = v.querySelector('.hand');
+    const f = TBL.fan(handEl, handCards, { pick: false, lift: 16, spread: 0.6, arc: 0.8, maxRot: 12 });
+    tableFans.push(f);
+    TBL.scatter(v.querySelectorAll('.deckspot, .pad'), 'sk', { rot: 5, off: 1 });
+    // A fresh deal: each card flies from the deck stack and turns over in your hand.
+    if (dealing && f) {
+      const deck = v.querySelector('.deckspot');
+      const d = deck && deck.getBoundingClientRect();
+      if (d && d.width) f.cards.forEach(c => {
+        const b = c.getBoundingClientRect();
+        c.style.setProperty('--dx', Math.round(d.left + d.width / 2 - (b.left + b.width / 2)) + 'px');
+        c.style.setProperty('--dy', Math.round(d.top + d.height / 2 - (b.top + b.height / 2)) + 'px');
+      });
+    }
+  }
+
+  function padSheet() {
+    const st = PLAY.state;
+    if (!st) return;
+    openSheet(`<h3>Score pad</h3><div class="padsheet">${playSideHTML(st)}</div><div class="acts"><button class="btn" data-act="close-sheet">Close</button></div>`);
   }
 
   function playMessage(st, view) {
@@ -1136,6 +1232,7 @@
       case 'pl-ab-discard': applyAction({ type: 'ability', seat: me, discard: PLAY.discard.slice() }); afterChange(); return true;
       case 'pl-next': if (sheetOpen) closeSheet(); if (PLAY.state.phase === 'roundEnd') { applyAction({ type: 'next' }); afterChange(); } return true;
       case 'pl-results': resultsSheet(); return true;
+      case 'pl-pad': padSheet(); return true;
       case 'net-create': netCreate(); return true;
       case 'net-join': netJoin(); return true;
       case 'net-leave': if (sheetOpen) closeSheet(); netLeave(); return true;
@@ -1274,6 +1371,8 @@
 
   // ============================================================ BOOT
   if (Art) $('#brandMark').innerHTML = Art.kindIcon ? Art.kindIcon('sk') : '';
+  // the card back art, for decks, held hands and won tricks drawn with the table kit
+  if (Art) document.documentElement.style.setProperty('--skback', `url("data:image/svg+xml,${encodeURIComponent(Art.back()).replace(/'/g, '%27')}")`);
   // A reload while a sheet was open leaves a stale sheet entry in history: step
   // off it so the next Back really goes back.
   if (history.state && history.state.sheet) history.back();
