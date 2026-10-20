@@ -1,7 +1,7 @@
 # Skull King: progress
 
 ## START HERE
-Read in this order: this file → `CLAUDE.md` → `docs/rules-check.md` (rules and sources) → `docs/ideas.md`. Last updated **2026-10-20** (first build + phase 2 + QA fixes + visual design pass, assets ?v=4).
+Read in this order: this file → `CLAUDE.md` → `docs/rules-check.md` (rules and sources) → `docs/ideas.md`. Last updated **2026-10-20** (first build + phase 2 + QA fixes + visual design pass + sounds/celebrations/animations, assets ?v=5).
 
 ## Goal right now
 A Skull King site for Tim's phone: a real-table scorekeeper and bid advisor (used most), plus the full game with exact rules against computers or friends online.
@@ -17,7 +17,34 @@ A Skull King site for Tim's phone: a real-table scorekeeper and bid advisor (use
 | Original SVG art for all 74 cards + icon | Done |
 | QA round (2026-10-20): reload after round 1 froze vs-computer games (`PLAY.log` not restored); advisor hand/picker/chart overflow at 10/13/23 cards; impossible trick totals; New→Undo lost top buttons; 8-player side table clipped; stale sheet history on reload; duplicate online names; failed join cleared the code | Fixed; checked by scratch scripts `sk-qa-verify.mjs` + `sk-qa-net.mjs` (reload bug reproduced on the old live build first) |
 | Visual design pass (2026-10-20): bigger hand/trick cards sized by count (hand = one row or two even rows, trick = one slot per player), centred bid pad, desktop Bid tab layout fixed, readable Game length dropdown, odds table corner specks gone, 40px steppers/bonus chips, true minus signs | Done; before/after screenshots in the manager's scratchpad `design/skull-king/` |
-| Tests: engine 37, ai 9, online 5 (all pass); each one seen failing under a deliberate bug (50 mutations, 51/51 covered) | Done |
+| Sound & effects (2026-10-20): shared `js/fx.js` 1.0.1 (copied unchanged from `_fx/`) + game-local `js/sfx.js` (state-diff → sounds/animations, 6 custom sounds); "Sound & effects" group in Settings; scorekeeper ticks/count-up/finish confetti | Done; see the event→sound map below |
+| Tests: engine 37, ai 9, online 5, fx 9 (all pass); engine/ai/online each seen failing under a deliberate bug (50 mutations); fx test failed before sfx.js existed and caught 11/11 mutations | Done |
+
+## Event → sound map (js/sfx.js; same for you, computers and online players)
+| Event | Sound | Animation |
+|---|---|---|
+| Deal (new round) | `shuffle`, then `cardDeal` × cards (max 6) | hand cards deal in one after another |
+| A bid / Cannonball choice locked in | `place` (soft knock) | none |
+| All bids shown | `yoho` (custom: three fists on the table + rising "yo-ho-ho") | bid numbers pop in time with the fists |
+| Cannonball revealed (anyone chose it) | `hit` | none |
+| Card played: number / escape / Tigress-as-escape | `cardFlip` | card flies from your hand or the player's chip to its trick slot |
+| Pirate / Tigress-as-pirate | `cutlass` (custom) | same |
+| Skull King | `skullKing` (custom deep thud) | same |
+| Mermaid | `mermaid` (custom harp run) | same |
+| Kraken / White Whale | `kraken` / `whale` (custom) | same |
+| Loot | `coins` | same |
+| Trick taken (plain) | `cardSlide` | winner's chip pops; "+N" gold float if bonus points |
+| Skull King takes pirates / pirate takes mermaid | `capture` | same |
+| Mermaid takes the Skull King | `capture` + **big** celebration (stars) when it's you | same |
+| Kraken trick sinks / Whale discards | `sink` / `splash` | trick shakes |
+| Bendt draws 2 | `cardDeal` × 2 | none |
+| Power used: Rosie / Harry / Juanita / Bendt discard / Rascal bet | `place` / `place` / `cardFlip` / `cardSlide` / `chips` (bet 10–20) | none |
+| Your turn (play, power, Cannonball choice) | `turn` (only when it becomes yours) | your chip pulses |
+| Illegal tap on a card | `error` | the card shakes |
+| Round over | your bid made `ding`, missed `miss` | chip scores count up; ± points float on each chip |
+| Game over | celebrate `win` (confetti in winners' colours) or `lose` | — |
+| Scorekeeper | steppers `tick`, bonus + `coin`, Rascal bet `chips`, Bids in `yoho`, round scored `coins` | totals count up; finished sheet gets the win confetti |
+Every other button: the shared quiet `tap`. Computer turns use the same sounds at the same volume.
 
 ## Measured strength (4 players, whole 10-round standard games, `tools/strength.js`)
 | Seat 0 | vs 3× | Games | Seat-0 win share (fair 25%) | Avg gap | Bid hit (seat 0 / others) |
@@ -35,6 +62,7 @@ BID_SCALE 1.15 chosen by tuning (medium mirror avg score: 0.7 → −21, 0.85 �
 ## Standing instructions (Tim's words)
 - "also skull king" (the game list: a bidding-odds trick-taking game).
 - "build regular play online with a computer or other online players for all the games and their common varients that match exactly the play of the in-person game… Brainstorm what additions you can do… Implement your good ideas… Really work on the webdesign… art… make sure that everything works properlly… Make sure to get everything right like rules and artwork and specific numbers of cards…"
+- "add opptional sounds you can add to the games that reflect what's happening in the game accurately as well as win celebrations, and other fun annimations to go along with everything. Just make sure everything is customizable in the settings so the user can play as preffered." (2026-10-20)
 - From the common brief: real-table companion first; odds at the point of decision; computers with measured strength; study mode; dark phone-first look on the Hub tokens; $0; no copyrighted art or rule text.
 
 ## Traps
@@ -46,6 +74,9 @@ BID_SCALE 1.15 chosen by tuning (medium mirror avg score: 0.7 → −21, 0.85 �
 - Saved state with an unknown `settings.schedule` key crashes render (`SK.SCHEDULES[S.schedule].name`). Valid keys: standard, evenKeeled, skipBrawl, swift, broadside, whirlpool, bedtime.
 - online.js (shared, not ours to edit) gives a mid-game seat back to anyone who joins with the same name while that player is away. The app now refuses a duplicate name in the lobby, but binding mid-game rejoin to the uid needs an online.js change (flagged to the manager).
 - Port 8231 on this laptop may be another agent's server; use your own port.
+- `js/fx.js` is shared: never edit it here; re-copy from `Board and Card Games/_fx/fx.js` (it changed 1.0.0 → 1.0.1 mid-build). Game sounds go in `js/sfx.js` via `FX.define`.
+- Headless WebKit on Windows has no Web Audio: `FX.play` returns false there. Check sounds with a spy on `FX.play` (pattern: manager scratchpad `design/skull-king-fx/sk-fx.mjs`) or with `--engine chrome`, which really plays.
+- Sounds are driven by `PLAY.fxArmed/fxPrev` (set in `applyAction`, `startGame`, `onNetSnap`; consumed in `afterChange`). A new state path must arm it too or it will be silent.
 
 ## Decisions
 - Medium bids from simulated expected tricks × 1.15; Hard = 40-sample determinized Monte Carlo with medium rollouts.
@@ -56,9 +87,13 @@ BID_SCALE 1.15 chosen by tuning (medium mirror avg score: 0.7 → −21, 0.85 �
 - Play layout: hand cards up to 64 px (phone) / 88 px (laptop); more than 6 (phone) or 8 (laptop) cards split into two even rows. Bid pad up to 8 (phone) / 14 (laptop) per row. During bidding the empty trick area collapses so round 10 fits at 393x659.
 - Study "every hand" reveal is local-only (online it would leak hands).
 - The 2025 expansion pack isn't implemented (rules unsettled).
+- Sound & effects is a Settings group after "Help while playing"; the "Fast" there is animation speed, separate from Computer speed.
+- The big celebration fires only when YOU take the Skull King with a mermaid; others' captures get the `capture` sound only.
 
 ## NOT verified
 - On Tim's real iPhone (only WebKit headless at 393 px).
+- How the sounds actually sound (synthesised; heard by no one yet). Real audio playback checked only in headless Chrome (`FX.play` returned true for every event).
+- Sounds in a real 2-phone online room (checked through `?netlocal=1` only).
 - Online with 3+ real people at once and host hand-over when the host closes the tab (online.js handles it; not exercised here).
 - 10-card hand on a laptop shorter than 800 px (checked at 1280x800 only).
 - Online lobby screen after the design pass (needs a real room; `?netlocal=1` jumps straight into a game).

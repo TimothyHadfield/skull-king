@@ -25,6 +25,16 @@
   const PLAYER_COLORS = ['#f0b354', '#6ea8fe', '#6ee7a8', '#f08c8c', '#c59bf5', '#5fd3d0', '#f5a3c7', '#b8c26b'];
   const CPU_NAMES = ['Anne', 'Edward', 'Grace', 'Henry', 'Mary', 'William', 'Ching'];
 
+  // Sound & effects (js/fx.js shared library + js/sfx.js for this game). All optional:
+  // the switches live in Settings. Buttons with their own sound skip the generic tap.
+  const FXL = window.FX || null, SFX = window.SKFX || null;
+  const fxPlay = (name, o) => (FXL ? FXL.play(name, o) : false);
+  if (FXL) {
+    FXL.init({ game: 'skull-king', clickSelector: 'button:not([data-act="sc-step"]):not([data-act="sc-bstep"]):not([data-act="sc-bet"]):not([data-act="pl-bid"]):not([data-act="sc-phase"]), [role="button"]' });
+    const still = () => document.body.classList.toggle('fx-still', !FXL.settings.animations); // Animations off = the card deal/drop too
+    still(); FXL.onChange(still);
+  }
+
   function load() { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } }
   let saveTimer = 0;
   function save() {
@@ -224,6 +234,25 @@
     $('#scSide').style.display = window.innerWidth >= 900 ? '' : 'none';
   }
 
+  // After a round is scored: totals count up to their new values, and a finished
+  // sheet gets the win celebration in the leaders' colours.
+  function scoreFx(before, finishedNow) {
+    if (!FXL || !SC || tab !== 'score') return;
+    const after = scTotals(SC, SC.cur);
+    let moved = false;
+    document.querySelectorAll('#v-score .sc-tot').forEach((el, p) => {
+      if (before[p] == null || before[p] === after[p]) return;
+      moved = true;
+      FXL.countUp(el, before[p], after[p], { duration: 650 });
+    });
+    if (moved) fxPlay('coins');
+    if (finishedNow) {
+      const t = scTotals(SC, 99), best = Math.max(...t);
+      const colors = SC.players.map((_, p) => p).filter(p => t[p] === best).map(p => PLAYER_COLORS[p % 8]).concat(['#f0b354', '#e8eaf0']);
+      FXL.celebrate({ kind: 'win', colors });
+    }
+  }
+
   function livePts(sc, p) {
     const r = sc.rounds[sc.cur];
     const b = r.bonus[p] || {};
@@ -309,26 +338,30 @@
       }
       case 'sc-step': {
         const r = sc.rounds[sc.cur], p = +d.p, arr = sc.phase === 'tricks' ? r.tricks : r.bids;
+        fxPlay('tick', { cat: 'ui', pitch: +d.d > 0 ? 1.12 : 0.9 });
         arr[p] = clamp(arr[p] + (+d.d), 0, r.cards); renderScore(); save(); return true;
       }
       case 'sc-cannon': { const r = sc.rounds[sc.cur]; r.cannon[+d.p] = !r.cannon[+d.p]; renderScore(); save(); return true; }
-      case 'sc-phase': sc.phase = d.ph; if (d.ph === 'bid') sc.rounds[sc.cur].done = sc.rounds[sc.cur].done; renderScore(); save(); return true;
+      case 'sc-phase': fxPlay(d.ph === 'tricks' && sc.phase === 'bid' ? 'yoho' : 'tap', d.ph === 'tricks' && sc.phase === 'bid' ? undefined : { cat: 'ui' }); sc.phase = d.ph; if (d.ph === 'bid') sc.rounds[sc.cur].done = sc.rounds[sc.cur].done; renderScore(); save(); return true;
       case 'sc-bonus': scoreBonusSheet(+d.p); return true;
       case 'sc-bstep': {
         const b = sc.rounds[sc.cur].bonus[+d.p];
+        fxPlay(+d.d > 0 ? 'coin' : 'tick', +d.d > 0 ? undefined : { cat: 'ui' });
         b[d.k] = Math.max(0, (b[d.k] || 0) + (+d.d)); scoreBonusSheet(+d.p); renderScore(); save(); return true;
       }
-      case 'sc-bet': { sc.rounds[sc.cur].bonus[+d.p].bet = +d.v; scoreBonusSheet(+d.p); renderScore(); save(); return true; }
+      case 'sc-bet': { fxPlay(+d.v > 0 ? 'chips' : 'tick', +d.v > 0 ? undefined : { cat: 'ui' }); sc.rounds[sc.cur].bonus[+d.p].bet = +d.v; scoreBonusSheet(+d.p); renderScore(); save(); return true; }
       case 'sc-done': {
+        const before = scTotals(sc, sc.cur), wasOver = scFinished(sc);
         sc.rounds[sc.cur].done = true;
         if (sc.rounds.length < scPlanned(sc) || !scFinished(sc)) {
           if (sc.rounds.length >= scPlanned(sc)) toast('Tied at the top: one more round');
           scNewRound(sc);
         }
-        renderScore(); save(); return true;
+        renderScore(); save(); scoreFx(before, !wasOver && scFinished(sc)); return true;
       }
       case 'sc-goto': {
         const dd = +d.d;
+        if (dd > 0 && sc.cur < sc.rounds.length - 1) { const before = scTotals(sc, sc.cur); setTimeout(() => scoreFx(before, false), 0); }
         if (dd < 0) {
           if (sc.phase === 'tricks') sc.phase = 'bid';
           else if (sc.cur > 0) { sc.cur--; sc.phase = 'tricks'; }
@@ -549,6 +582,12 @@
   };
   if (!PLAY.setup) PLAY.setup = [{ kind: 'you' }, { kind: 'cpu', level: 'medium' }, { kind: 'cpu', level: 'medium' }, { kind: 'cpu', level: 'hard' }];
   if (PLAY.state && PLAY.state.v !== 2) { PLAY.state = null; }
+  if (SFX) SFX.attach({
+    visible: () => tab === 'play' && !document.hidden,
+    root: () => $('#v-play'),
+    colors: seats => seats.map(p => PLAYER_COLORS[p % 8]).concat(['#f0b354', '#e8eaf0']),
+    from: () => PLAY.fxFrom || null,
+  });
 
   const LEVEL_NOTE = { easy: 'plays by feel', medium: 'counts cards', hard: 'simulates' };
 
@@ -847,6 +886,7 @@
     if ((snap.status === 'playing' || snap.status === 'finished') && snap.pub && snap.mine && snap.mySeat >= 0) {
       const prev = PLAY.state;
       const st = window.SKGame.merge(snap.pub, snap.mine, snap.mySeat);
+      if (!PLAY.fxArmed) { PLAY.fxArmed = true; PLAY.fxPrev = prev; } // sounds come from the snapshot diff
       PLAY.me = snap.mySeat;
       PLAY.seats = st.players.map(p => (p.kind === 'ghost' ? { kind: 'ghost' } : p.kind === 'cpu' ? { kind: 'cpu', level: p.level } : { kind: 'net' }));
       PLAY.state = st;
@@ -898,6 +938,7 @@
     PLAY.me = 0; PLAY.gen++; PLAY.log = []; PLAY.hint = null; PLAY.sel = null; PLAY.discard = [];
     PLAY.study = { bidLost: 0, playLost: 0, rBid: 0, rPlay: 0, round: 1, last: '' };
     PLAY.shownRoundSheet = 0;
+    PLAY.fxArmed = true; PLAY.fxPrev = null; // the first deal
     onRoundStart();
     afterChange();
   }
@@ -931,6 +972,7 @@
     const prev = PLAY.state;
     let next;
     try { next = SK.apply(prev, a); } catch (e) { toast(e.message); return false; }
+    if (!PLAY.fxArmed) { PLAY.fxArmed = true; PLAY.fxPrev = prev; }
     PLAY.state = next;
     if (next.tricksDone !== prev.tricksDone || next.round !== prev.round || next.history.length !== prev.history.length) logTrick(prev, next);
     if (next.round !== prev.round) onRoundStart();
@@ -950,6 +992,11 @@
     save();
     if (tab === 'play') renderPlay();
     const st = PLAY.state;
+    if (PLAY.fxArmed) {
+      PLAY.fxArmed = false;
+      if (SFX && st) SFX.react(PLAY.fxPrev, st, PLAY.me);
+      PLAY.fxPrev = null; PLAY.fxFrom = null;
+    }
     if (!st) return;
     if ((st.phase === 'roundEnd' || st.phase === 'over' || (PLAY.net && st.history.length)) && PLAY.shownRoundSheet !== st.history.length && tab === 'play') {
       PLAY.shownRoundSheet = st.history.length;
@@ -1065,13 +1112,15 @@
       case 'pl-bid': studyAfterBid(+d.b); applyAction({ type: 'bid', seat: me, bid: +d.b }); afterChange(); return true;
       case 'pl-cannon': applyAction({ type: 'cannon', seat: me, on: d.on === '1' }); afterChange(); return true;
       case 'pl-card': {
-        if (!(st.phase === 'play' && st.turn === me)) return true;
+        if (!(st.phase === 'play' && st.turn === me)) { if (st.phase === 'play' && SFX) SFX.illegal(el); return true; }
         const id = +el.dataset.id;
-        if (SK.legalPlays(st, me).indexOf(id) < 0) { toast('Follow the suit that was led'); return true; }
+        if (SK.legalPlays(st, me).indexOf(id) < 0) { if (SFX) SFX.illegal(el); toast('Follow the suit that was led'); return true; }
         if (CARDS[id].k === 'tig') { PLAY.sel = id; renderPlay(); return true; }
+        PLAY.fxFrom = el.getBoundingClientRect(); // the card flies from here to the table
         studyAfterPlay({ id }); applyAction({ type: 'play', seat: me, card: id }); afterChange(); return true;
       }
-      case 'pl-tig': { const id = PLAY.sel; studyAfterPlay({ id, as: d.as }); applyAction({ type: 'play', seat: me, card: id, as: d.as }); afterChange(); return true; }
+      case 'pl-tig': { const id = PLAY.sel; studyAfterPlay({ id, as: d.as });
+        const src = document.querySelector(`#v-play .hand [data-id="${id}"]`); if (src) PLAY.fxFrom = src.getBoundingClientRect(); applyAction({ type: 'play', seat: me, card: id, as: d.as }); afterChange(); return true; }
       case 'pl-unsel': PLAY.sel = null; renderPlay(); return true;
       case 'pl-hint': hint(); return true;
       case 'pl-ab': {
@@ -1127,10 +1176,12 @@
         <div class="set-row"><div class="t">Computer speed</div><div class="seg" style="width:160px"><button data-act="set-speed" data-v="normal" class="${S.speed === 'normal' ? 'on' : ''}">Normal</button><button data-act="set-speed" data-v="fast" class="${S.speed === 'fast' ? 'on' : ''}">Fast</button></div></div>
         ${PLAY.state ? `<div class="set-row"><div class="t">Current game</div><button class="btn sm" data-act="pl-quit">Leave game</button></div>` : ''}
       </div>
+      ${FXL ? '<div class="set-group"><h3>Sound &amp; effects</h3><div id="fxSet"></div></div>' : ''}
       <div class="set-group"><h3>How strong are the computers? ${q('strength')}</h3><div style="padding:4px 14px 12px">${strengthNote()}</div></div>
       <div class="set-group"><details class="rules"><summary>How Skull King works ›</summary><div class="rules-body">${RULES_HTML}</div></details></div>
       <div class="set-group"><div class="set-row"><div class="t"><a href="../">More board &amp; card games</a></div><span class="muted" style="font-size:12px">v${VERSION}</span></div></div>
     </div></div>`;
+    if (FXL && $('#fxSet')) FXL.renderSettings($('#fxSet'));
   }
 
   const RULES_HTML = `

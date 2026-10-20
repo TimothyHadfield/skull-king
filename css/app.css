@@ -321,3 +321,20 @@ select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 details.rules summary { cursor: pointer; padding: 12px 14px; font-weight: 650; list-style: none; }
 details.rules summary::-webkit-details-marker { display: none; }
 a { color: var(--accent); }
+
+/* Sound & effects rows (js/fx.js) in this page's own settings look */
+.set .fx-set .fx-row { padding: 9px 14px; min-height: 50px; }
+.set .fx-set .fx-lab { font-weight: 600; gap: 6px; }
+.set .fx-set .switch { width: 50px; height: 30px; }
+.set .fx-set .switch span { background: #39405a; border-radius: 15px; }
+.set .fx-set .switch span::after { width: 24px; height: 24px; box-shadow: 0 1px 3px rgba(0,0,0,.4); transition: transform .18s; }
+.set .fx-set .switch input:checked + span { background: var(--good); }
+.set .fx-set .switch input:checked + span::after { transform: translateX(20px); }
+.set .fx-set .seg { width: 160px; }
+.set .fx-set .seg button { flex: 1; height: 32px; padding: 0 10px; cursor: pointer; }
+.set .fx-set .seg button[aria-pressed="true"] { background: var(--card-hover); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+.set .fx-set .fx-vol { flex: 0 1 160px; }
+.set .fx-set .fx-test { height: 32px; padding: 0 12px; cursor: pointer; }
+.set .fx-set .fx-why { padding: 0 14px 8px; }
+/* Animations off: the card deal and drop are instant too */
+.fx-still .cardf.deal, .fx-still .cardf.drop { animation: none; }
