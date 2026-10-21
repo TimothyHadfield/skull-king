@@ -1,7 +1,7 @@
 # Skull King: progress
 
 ## START HERE
-Read in this order: this file → `CLAUDE.md` → `docs/rules-check.md` (rules and sources) → `docs/ideas.md`. Last updated **2026-10-20** (first build + phase 2 + QA fixes + visual design pass + sounds/celebrations/animations + real-table Play screen, assets ?v=6).
+Read in this order: this file → `CLAUDE.md` → `docs/rules-check.md` (rules and sources) → `docs/ideas.md`. Last updated **2026-10-20** (first build + phase 2 + QA fixes + visual design pass + sounds/celebrations/animations + real-table Play screen + weird-scenario edge pass, assets ?v=7).
 
 ## Goal right now
 A Skull King site for Tim's phone: a real-table scorekeeper and bid advisor (used most), plus the full game with exact rules against computers or friends online.
@@ -19,7 +19,25 @@ A Skull King site for Tim's phone: a real-table scorekeeper and bid advisor (use
 | Visual design pass (2026-10-20): bigger hand/trick cards sized by count (hand = one row or two even rows, trick = one slot per player), centred bid pad, desktop Bid tab layout fixed, readable Game length dropdown, odds table corner specks gone, 40px steppers/bonus chips, true minus signs | Done; before/after screenshots in the manager's scratchpad `design/skull-king/` |
 | Sound & effects (2026-10-20): shared `js/fx.js` 1.0.1 (copied unchanged from `_fx/`) + game-local `js/sfx.js` (state-diff → sounds/animations, 6 custom sounds); "Sound & effects" group in Settings; scorekeeper ticks/count-up/finish confetti | Done; see the event→sound map below |
 | Real-table Play screen (2026-10-20): dark-wood table from the shared `_table` kit (`js/table.js` + `css/table.css`, byte copies). Opponents round the far side with a name plate, a fan of card backs and, in front of them, a bid token plus their won tricks as small face-down cards. Each trick card lies in front of whoever played it. The deck is on the table, your hand is fanned at the bottom, and a paper score pad on the table opens the round table on phone (the side panel shows it on laptop). Cards deal from the deck with a flip, opponents' cards turn up as they land, and the finished trick slides to the winner. fx.js re-copied at 1.0.3 | Done; research in the manager's scratchpad `table/skull-king/real.md`, before/after shots in `table/skull-king/` (10 states x 393, 1280, 320, 659-landscape: 40/40 with no overflow and no errors), 2 reviewer rounds |
-| Tests: engine 37, ai 9, online 5, fx 9 (all pass); engine/ai/online each seen failing under a deliberate bug (50 mutations); fx test failed before sfx.js existed and caught 11/11 mutations | Done |
+| Edge pass (2026-10-20): 59 weird scenarios tested, 15 failed on the old code, all fixed (see "Edge pass" below) | Done |
+| Tests: engine 39, ai 9, online 5, fx 9 (all pass); engine/ai/online each seen failing under a deliberate bug (50 mutations); fx test failed before sfx.js existed and caught 11/11 mutations | Done |
+
+## Edge pass (2026-10-20): weird scenarios
+59 scenarios (rare rules, odd people, odd taps, odd devices, odd screens) in the manager's scratchpad `edge/skull-king/scenarios.md`, with scripts `rules.cjs`, `ui.mjs`, `da.mjs`, `extra.mjs`, `tap.mjs` and shots. 41 passed on the old code, 3 were only covered indirectly, 15 failed and are fixed (each seen failing first):
+| Failure on the old code | Fix |
+|---|---|
+| 10-card hand: 27–33 px tap strips (phone/SE/landscape); Bendt's discards couldn't be picked from 11 cards | Hand goes to two rows when one row would be under 42 px per card; landscape stays one row (45–48 px); turning the phone re-lays it out |
+| Hint froze the screen 4–9 s with no feedback; double-tap computed twice | "Thinking…" at once, computed once |
+| Junk saved data (unknown schedule, broken play state or scoresheet) crashed screens | Validated on load and dropped |
+| Blank / null bid read as 0; emoji names cut in half | Engine refuses it; names cut by whole characters |
+| Harry −1 at bid 0 enabled but did nothing | Disabled |
+| Scorekeeper at 320 px: names shrank to "…", Total and Bids/Tricks cut off | Name on its own line, everything fits |
+| Scorekeeper 2 players: ghost's trick blocked "Next" | Fewer tricks allowed with 2 players |
+| Cannonball: computers' secret picks showed early; "Cannonball or Grapeshot?" with no buttons after you picked | Hidden until all are in; "Waiting for the others…" |
+| Ghost's trick showed "+30 bonus" | Not shown for the ghost |
+| Leave from Settings left the "Leave game" row | Settings re-renders |
+| Online: round ended behind "Leave this game?" and its results were lost | Results wait and show when the sheet closes |
+| Online: a refused/unanswered move locked all taps | Taps free again after 6 s or on error |
 
 ## Event → sound map (js/sfx.js; same for you, computers and online players)
 | Event | Sound | Animation |
@@ -65,6 +83,7 @@ BID_SCALE 1.15 chosen by tuning (medium mirror avg score: 0.7 → −21, 0.85 �
 - "build regular play online with a computer or other online players for all the games and their common varients that match exactly the play of the in-person game… Brainstorm what additions you can do… Implement your good ideas… Really work on the webdesign… art… make sure that everything works properlly… Make sure to get everything right like rules and artwork and specific numbers of cards…"
 - "add opptional sounds you can add to the games that reflect what's happening in the game accurately as well as win celebrations, and other fun annimations to go along with everything. Just make sure everything is customizable in the settings so the user can play as preffered." (2026-10-20)
 - "could you also make sure that each of the games also have a look to them so that the game (either board or card layout) looks almost identical to how the board or card layout looks like in real life, so it's easy to understand if you've already played it before, and also so it feels more like you're actually playing in real life rather than you're playing it online. Even things like how youre cards or other things are laid out infront of you, make it look like they are actual cards laid out similar to how it looks like in real life. Make the decks look like actual decks. Make the board have the same design as it does in real life with the same layouts. It should look kind of like you're looking through a camera that is connected to a user's glasses that is playing in real life (not actually, but the layout and style of everything should be similar)." (2026-10-20)
+- "I've noticed the games often have good user interfaces but could be improved especially when a scenario happens that the game might've not really thought about or whatnot. Could you focus on making each game perfect especially in scenarios that the game doesn't expect or are a little weird." (2026-10-20)
 - From the common brief: real-table companion first; odds at the point of decision; computers with measured strength; study mode; dark phone-first look on the Hub tokens; $0; no copyrighted art or rule text.
 
 ## Traps
@@ -73,7 +92,10 @@ BID_SCALE 1.15 chosen by tuning (medium mirror avg score: 0.7 → −21, 0.85 �
 - `import()` inside a classic script resolves against the script URL in some engines: app.js builds the URL from `document.baseURI`.
 - Online: rounds advance by themselves (skgame.js `settle`), so the round sheet is shown from history growth, not a `roundEnd` phase.
 - WebKit logs "access control checks" page errors for Firestore channels when a page reloads mid-game; harmless (the reload resumes fine).
-- Saved state with an unknown `settings.schedule` key crashes render (`SK.SCHEDULES[S.schedule].name`). Valid keys: standard, evenKeeled, skipBrawl, swift, broadside, whirlpool, bedtime.
+- Saved state is validated on load in app.js (schedule, scoring, speed, scoresheet, play state via `playStateOk`). A new saved field needs a check there too. Valid schedule keys: standard, evenKeeled, skipBrawl, swift, broadside, whirlpool, bedtime.
+- Hand CSS uses `.hand .cardf` (not `.hand > .cardf`): a two-row hand nests cards in `.hrow` divs.
+- Headless WebKit on a busy laptop runs 1–2 frames a second: Playwright `page.click` on a moving or disabled button hangs to the timeout. Click with `page.evaluate(() => el.click())`, and wait 3 s after a viewport change (resize re-render is debounced).
+- WebKit logs "ResizeObserver loop completed with undelivered notifications" when the phone turns; it comes from the shared `js/table.js` (old code too) and is harmless.
 - online.js (shared, not ours to edit) gives a mid-game seat back to anyone who joins with the same name while that player is away. The app now refuses a duplicate name in the lobby, but binding mid-game rejoin to the uid needs an online.js change (flagged to the manager).
 - Port 8231 on this laptop may be another agent's server; use your own port.
 - `js/fx.js` is shared: never edit it here; re-copy from `Board and Card Games/_fx/fx.js` (it changed 1.0.0 → 1.0.1 mid-build). Game sounds go in `js/sfx.js` via `FX.define`.
@@ -90,7 +112,8 @@ BID_SCALE 1.15 chosen by tuning (medium mirror avg score: 0.7 → −21, 0.85 �
 - Cannonball implemented from the 2021 Rascal add-on text (see rules-check.md).
 - Online round results aren't paused; each player sees the results sheet when the round ends.
 - 6+ players: the side "This game" table shows 3-letter names (full name on hover) so all columns fit.
-- Score Tricks phase: Next is disabled until tricks add up to the hand size (fewer allowed only with Kraken/Whale in play).
+- Score Tricks phase: Next is disabled until tricks add up to the hand size (fewer allowed with Kraken/Whale in play, or with 2 players since the ghost's tricks aren't entered).
+- Edge pass choices made without Tim (2026-10-20): 10-card hand in two rows on phone (front row's odds badge moves to the card's bottom); scorekeeper rows at ≤360 px wrap to two lines (name above) and the Bids/Tricks switch narrows; Hint button says "Thinking…" while it works.
 - Play layout (2026-10-20, replaces the row layout): one fanned hand (76 px cards on phone, 100 px on laptop); trick cards are anchored in front of each seat (`trickAnchor` in app.js). Phone on its side moves the actions to the right edge. Laptop seats curve down toward the sides.
 - Table look choices made without Tim: dark wood; bids as wooden tokens with a black dot for Cannonball; won tricks as mini face-down cards; card names under trick cards dropped except Tigress's "as Pirate/Escape"; deck at the bottom-left; score pad as a tap target at the bottom-right on phone.
 - Study "every hand" reveal is local-only (online it would leak hands).
@@ -106,7 +129,9 @@ BID_SCALE 1.15 chosen by tuning (medium mirror avg score: 0.7 → −21, 0.85 �
 - 10-card hand on a laptop shorter than 800 px (checked at 1280x800 only).
 - Online lobby screen after the design pass (needs a real room; `?netlocal=1` jumps straight into a game).
 - Table animations (deal flip, turn-up, trick sliding to the winner) seen only as code and single frames; headless WebKit stalls transitions, so nobody has watched them play smoothly.
-- A 9–10 card fan at 393 px leaves each card a strip about 27–35 px wide to tap (under the 40 px guideline); not tried on a real thumb.
+- Two-row hand on a real thumb (measured ≥45 px tap strips in WebKit only).
+- Online netBusy 6 s release: no test could make the host refuse a move (reasoned fix).
+- Left as is (edge pass): online, the round's last trick isn't shown before the next deal (rounds advance at once by design); Bendt's 2 drawn cards aren't marked in the hand; an online player named "You" or a computer's name reads ambiguously; a scorekeeper tie-break round stays after an earlier round is edited out of the tie (finish it with zeros).
 - Real Skull King card size (poker size) is reasoned, not confirmed.
 - The bid "✓" renders as "√" in headless WebKit on Windows (font fallback); expected fine on iPhone.
 - Reload-with-sheet-open fix checked only via `history.state` after reload, not by pressing Back on a phone.

@@ -240,7 +240,7 @@
    *   seed?: int, firstDealer?: int } */
   function newGame(config) {
     const players = config.players.map((p, i) => ({
-      name: String(p.name || 'Player ' + (i + 1)).slice(0, 20), kind: p.kind || 'human', level: p.level || null }));
+      name: Array.from(String(p.name || 'Player ' + (i + 1))).slice(0, 20).join(''), kind: p.kind || 'human', level: p.level || null }));
     if (players.length < 2 || players.length > 8) throw new Error('2 to 8 players');
     const humans = players.length;
     let ghost = -1;
@@ -403,7 +403,8 @@
         if (st.phase !== 'bid') throw new Error('not bidding now');
         if (!(p >= 0 && p < st.n) || p === st.ghost) throw new Error('bad seat');
         if (st.bids[p] != null) throw new Error('already bid');
-        const b = Number(action.bid);
+        const raw = action.bid; // a missing/blank bid must not count as 0
+        const b = typeof raw === 'number' || (typeof raw === 'string' && raw.trim() !== '') ? Number(raw) : NaN;
         if (!Number.isInteger(b) || b < 0 || b > st.cards) throw new Error('bid out of range');
         st.bids[p] = b;
         if (st.bids.every(x => x != null)) {

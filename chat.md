@@ -1,5 +1,11 @@
 # Skull King: chat log
 
+## 2026-10-20: weird-scenario edge pass (builder agent)
+- Asked (Tim, via manager): "making each game perfect especially in scenarios that the game doesn't expect or are a little weird"; known issue: 27–35 px tap strips on a 10-card hand.
+- Built: two-row hand when one row is under 42 px per card (re-lays out on rotate); hint non-blocking with "Thinking…"; saved-data validation; engine refuses blank bids and cuts names by whole characters; Harry buttons disabled when they'd do nothing; 320 px scorekeeper fits; 2-player scorekeeper allows ghost tricks; Cannonball picks hidden until all in + waiting message; no ghost bonus text; Settings re-renders after Leave; online results wait behind an open sheet; online taps unlock after 6 s. Assets ?v=7.
+- Verified: 59 scenarios (manager scratchpad `edge/skull-king/`); 15 failed on the old code (seen failing first), all pass now; tests 39/9/5/9; tap strips measured in WebKit: phone ≥50 px, SE ≥50, landscape 45–48; screenshots at 320/393/landscape/1280.
+- Open: see NOT verified (real thumb, online refused-move path, items left as is).
+
 ## 2026-10-20: real-table look (builder agent)
 - Asked (Tim, via manager): make each game look like the real table "like you're looking through a camera ... connected to a user's glasses".
 - Built: Play screen rebuilt from your seat on the shared `_table` kit. It has a wood table, opponents' fans of backs, bid tokens, won tricks face down, the trick in front of each player, the deck, your fanned hand and a score pad. Cards deal from the deck with a 3-D flip, opponents' cards turn up and the trick slides to the winner. Landscape keeps the actions on the right. sfx.js selectors were updated for the new seats. fx.js was re-copied at 1.0.3. Assets ?v=6. No rule changes.

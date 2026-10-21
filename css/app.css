@@ -173,6 +173,21 @@ select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .sc-hdr span { text-align: right; } .sc-hdr span:first-child { text-align: left; }
 .sc-hdr .c2 { text-align: center; width: 104px; }
 @media (min-width: 900px) { .sc-cols { grid-template-columns: minmax(380px, 520px) 1fr; } }
+/* very narrow phones (320 px): the name gets its own line so it never shrinks to "…" */
+@media (max-width: 360px) {
+  .sc-row, .sc-row.tr { grid-template-columns: 104px minmax(0, 1fr) 50px; height: auto; padding: 5px 10px 6px; row-gap: 3px; }
+  .sc-row.tr { grid-template-columns: 104px 46px minmax(0, 1fr) 50px; }
+  .sc-row .sc-name { grid-column: 1 / -1; }
+  .sc-row .sc-name small { display: inline; margin-left: 6px; }
+  .sc-hdr, .sc-hdr.tr { grid-template-columns: 104px minmax(0, 1fr) 50px; }
+  .sc-hdr.tr { grid-template-columns: 104px 46px minmax(0, 1fr) 50px; }
+  .sc-hdr span:first-child { display: none; }
+  .sc-hdr .c2 { text-align: center; }
+  /* keep the whole sheet inside the screen: Total column and the Bids/Tricks switch were cut off */
+  .sc-cols { grid-template-columns: minmax(0, 1fr); }
+  .sc-head .seg { width: 124px !important; }
+  .sc-round { flex-wrap: wrap; row-gap: 0; }
+}
 .grid-table { width: 100%; border-collapse: collapse; font-size: 13.5px; font-variant-numeric: tabular-nums; }
 .grid-table th, .grid-table td { padding: 6px 6px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
 .grid-table th:first-child, .grid-table td:first-child { text-align: left; color: var(--muted); }
@@ -309,15 +324,19 @@ select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .bidpad .btn.hint { box-shadow: 0 0 0 2px var(--good); border-color: var(--good); }
 .mine { position: relative; z-index: 2; padding: 0 6px 8px; }
 .mine > .lay { gap: 8px; min-height: 26px; }
-.hand.tbl-fan { --card-w: var(--hw); margin: 2px 0 0; }
+.hand { --card-w: var(--hw); margin: 2px 0 0; }
 .hand.badges { margin-top: 16px; }
-.hand > .cardf { cursor: default; }
-.hand > .cardf.can { cursor: pointer; }
-.hand > .cardf.dim { filter: saturate(.35) brightness(.62); }
-.hand > .cardf.best { box-shadow: 0 0 0 2px var(--good), 0 8px 16px rgba(0,0,0,.5); }
-.hand > .cardf.sel { box-shadow: 0 0 0 2px #f0c35a, 0 12px 22px rgba(0,0,0,.5); }
-@media (hover: hover) { .hand > .cardf.can:hover:not(.is-up) { --up: 9px; } }
-.hand > .cardf .badge { position: absolute; left: 1px; top: -17px; bottom: auto; transform: none; font-size: 10.5px; font-weight: 800; padding: 0 4px; border-radius: 6px; background: rgba(12,8,4,.88); border: 1px solid rgba(255,220,160,.25); white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* big hand on a narrow screen: two overlapping fans, the back row shows its top 46px */
+.hand.two { display: flex; flex-direction: column; }
+.hand.two .hrow.front { margin-top: calc(26px - var(--hw) * 1.4); }
+.hand.two .hrow.front .cardf .badge { top: auto; bottom: 3px; }
+.hand .cardf { cursor: default; }
+.hand .cardf.can { cursor: pointer; }
+.hand .cardf.dim { filter: saturate(.35) brightness(.62); }
+.hand .cardf.best { box-shadow: 0 0 0 2px var(--good), 0 8px 16px rgba(0,0,0,.5); }
+.hand .cardf.sel { box-shadow: 0 0 0 2px #f0c35a, 0 12px 22px rgba(0,0,0,.5); }
+@media (hover: hover) { .hand .cardf.can:hover:not(.is-up) { --up: 9px; } }
+.hand .cardf .badge { position: absolute; left: 1px; top: -17px; bottom: auto; transform: none; font-size: 10.5px; font-weight: 800; padding: 0 4px; border-radius: 6px; background: rgba(12,8,4,.88); border: 1px solid rgba(255,220,160,.25); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .study { font-size: 13px; color: #e2cfa6; text-align: center; min-height: 18px; }
 .study b { color: #fff6e2; }
 .pl-side { display: none; }
@@ -327,8 +346,8 @@ select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 @keyframes dealFly { 0% { translate: var(--dx, 0) var(--dy, 60px); scale: .55 .55; } 48% { scale: .03 .8; } 100% { translate: 0 0; scale: 1 1; } }
 @keyframes backOff { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
 @keyframes turnUp { 0% { scale: 1 1; } 48% { scale: .03 1; } 100% { scale: 1 1; } }
-.hand > .cardf.deal { animation: dealFly .52s cubic-bezier(.3,.7,.3,1) both; }
-.hand > .cardf.deal::before, .tcard.turnin .cardf::before { content: ""; position: absolute; inset: 0; z-index: 2; border-radius: inherit; background: var(--skback) center / 100% 100% no-repeat; animation: backOff .52s linear both; animation-delay: inherit; pointer-events: none; }
+.hand .cardf.deal { animation: dealFly .52s cubic-bezier(.3,.7,.3,1) both; }
+.hand .cardf.deal::before, .tcard.turnin .cardf::before { content: ""; position: absolute; inset: 0; z-index: 2; border-radius: inherit; background: var(--skback) center / 100% 100% no-repeat; animation: backOff .52s linear both; animation-delay: inherit; pointer-events: none; }
 .tcard.turnin .cardf { animation: turnUp .36s ease-in-out both; }
 .tcard.turnin .cardf::before { animation-duration: .36s; }
 .tcard.turnin .cardf.drop { animation: dropIn .26s ease-out both, turnUp .36s ease-in-out both; }
@@ -432,4 +451,4 @@ a { color: var(--accent); }
 /* Animations off: the card deal and drop are instant too */
 .fx-still .cardf.deal, .fx-still .cardf.drop, .fx-still .tcard.turnin .cardf { animation: none; }
 .fx-still .cardf.deal::before, .fx-still .tcard.turnin .cardf::before { display: none; }
-@media (prefers-reduced-motion: reduce) { .hand > .cardf.deal, .tcard.turnin .cardf { animation: none; } .hand > .cardf.deal::before, .tcard.turnin .cardf::before { display: none; } }
+@media (prefers-reduced-motion: reduce) { .hand .cardf.deal, .tcard.turnin .cardf { animation: none; } .hand .cardf.deal::before, .tcard.turnin .cardf::before { display: none; } }

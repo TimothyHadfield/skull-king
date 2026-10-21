@@ -335,6 +335,19 @@ test('a tie at the end adds a round', () => {
   st = SK.apply(st, { type: 'next' });
   assert.strictEqual(st.round, 2); assert.strictEqual(st.cards, 1);
 });
+test('edge: a missing or blank bid is refused, not read as 0', () => {
+  const st = SK.newGame({ players: [{}, {}, {}], seed: 5 });
+  for (const b of [null, undefined, '', ' ', true, [], 0.5]) {
+    assert.throws(() => SK.apply(st, { type: 'bid', seat: 0, bid: b }), 'accepted ' + JSON.stringify(b));
+  }
+  assert.strictEqual(SK.apply(st, { type: 'bid', seat: 0, bid: 0 }).bids[0], 0);
+});
+test('edge: a long emoji name is cut whole, never half an emoji', () => {
+  const st = SK.newGame({ players: [{ name: 'a'.repeat(19) + '😀😀' }, { name: '🦜'.repeat(25) }, {}], seed: 5 });
+  const lone = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+  assert.ok(!lone.test(st.players[0].name), 'split emoji in ' + JSON.stringify(st.players[0].name));
+  assert.strictEqual(Array.from(st.players[1].name).length, 20);
+});
 
 console.log(`engine: ${passed} passed, ${failed} failed`);
 if (failed) process.exit(1);

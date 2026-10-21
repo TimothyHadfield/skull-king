@@ -16,6 +16,8 @@
   const neg = n => (n < 0 ? '−' + Math.abs(n) : String(n)); // true minus sign for totals
   const cls = n => (n > 0 ? 'pos' : n < 0 ? 'neg' : '');
   const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+  // first n characters, never splitting an emoji in half
+  const cut = (s, n) => Array.from(String(s)).slice(0, n).join('');
   // red -> green for a 0..1 value
   function heat(t) {
     t = clamp(t, 0, 1);
@@ -49,6 +51,10 @@
     scoring: 'sk', cannonball: false, kraken: false, whale: false, loot: false, abilities: false,
     schedule: 'standard', ghost: true, odds: true, study: false, speed: 'normal',
   }, saved.settings || {});
+  // Saved data from an older or broken version must not stop the page from opening.
+  if (!SK.SCHEDULES[S.schedule]) S.schedule = 'standard';
+  if (S.scoring !== 'rascal') S.scoring = 'sk';
+  if (S.speed !== 'fast') S.speed = 'normal';
 
   // ---------------------------------------------------------- card faces
   function face(id, size, extra) {
@@ -119,6 +125,7 @@
   function openSheet(html) {
     $('#sheet').innerHTML = html;
     $('#sheetBack').hidden = false;
+    sheetKind = ''; // the caller names its sheet after opening it
     if (!sheetOpen) history.pushState({ sheet: 1 }, '');
     sheetOpen = true;
   }
@@ -128,11 +135,14 @@
     sheetOpen = false;
     sheetKind = '';
     if (!fromPop) history.back();
+    setTimeout(showDueResults, 400); // results that waited behind this sheet
   }
   let sheetKind = '';
 
   // ============================================================ SCORE
   let SC = saved.score || null;
+  if (SC && !(Array.isArray(SC.players) && SC.players.length >= 2 && Array.isArray(SC.rounds) && SC.rounds.length && SC.rounds[SC.cur])) SC = null;
+  if (SC && !SK.SCHEDULES[SC.schedule]) SC.schedule = 'standard';
 
   function bonusTotal(b) {
     if (!b) return 0;
@@ -172,7 +182,7 @@
     return t.filter(x => x === best).length === 1 || sc.noTiebreak;
   }
 
-  let scSetupNames = (saved.lastNames && saved.lastNames.length ? saved.lastNames : null) || ['', '', '', ''];
+  let scSetupNames = (Array.isArray(saved.lastNames) && saved.lastNames.length >= 2 ? saved.lastNames.slice(0, 8).map(x => String(x == null ? '' : x)) : null) || ['', '', '', ''];
   let scTableOpen = false;
 
   function renderScore() {
@@ -186,7 +196,8 @@
     const isTr = sc.phase === 'tricks';
     const sumB = r.bids.reduce((a, b) => a + b, 0), sumT = r.tricks.reduce((a, b) => a + b, 0);
     // Tricks can't add up to more than were played; fewer only if a Kraken/Whale threw one away.
-    const tricksBad = isTr && (sumT > r.cards || (sumT < r.cards && !(S.kraken || S.whale)));
+    // Two players: Graybeard's ghost takes tricks nobody scores, so fewer is fine too.
+    const tricksBad = isTr && (sumT > r.cards || (sumT < r.cards && !(S.kraken || S.whale || n === 2)));
     const rows = sc.players.map((name, p) => {
       const val = isTr ? r.tricks[p] : r.bids[p];
       const step = `<div class="step sm"><button data-act="sc-step" data-p="${p}" data-d="-1" ${val <= 0 ? 'disabled' : ''} aria-label="less">−</button><span class="val">${val}</span><button data-act="sc-step" data-p="${p}" data-d="1" ${val >= r.cards || (isTr && sumT >= r.cards) ? 'disabled' : ''} aria-label="more">+</button></div>`;
@@ -270,7 +281,7 @@
 
   function scoreTableHTML(sc) {
     const n = sc.players.length;
-    const head = sc.players.map(nm => `<th title="${esc(nm)}">${esc(nm.slice(0, 8))}</th>`).join('');
+    const head = sc.players.map(nm => `<th title="${esc(nm)}">${esc(cut(nm, 8))}</th>`).join('');
     const body = sc.rounds.map((r, ri) => {
       if (!r.done && ri !== sc.cur) return '';
       const tds = sc.players.map((_, p) => {
@@ -396,6 +407,10 @@
 
   // ============================================================ ADVISOR
   const ADV = Object.assign({ players: 4, cards: 3, before: 0, hand: [], mode: 'hand' }, saved.adv || {});
+  ADV.players = clamp(Math.round(+ADV.players) || 4, 2, 8);
+  ADV.cards = Math.round(+ADV.cards) || 1; ADV.before = Math.round(+ADV.before) || 0;
+  if (!Array.isArray(ADV.hand)) ADV.hand = [];
+  if (ADV.mode !== 'odds') ADV.mode = 'hand';
   let advAcc = null, advKey = '', advTimer = 0, advGen = 0;
   const ADV_TARGET = 2000;
 
@@ -581,7 +596,14 @@
     setup: null, gen: 0, timer: 0, me: 0, sel: null, hint: null, evalCache: null, bidCache: null, busy: false, discard: [],
   };
   if (!PLAY.setup) PLAY.setup = [{ kind: 'you' }, { kind: 'cpu', level: 'medium' }, { kind: 'cpu', level: 'medium' }, { kind: 'cpu', level: 'hard' }];
-  if (PLAY.state && PLAY.state.v !== 2) { PLAY.state = null; }
+  if (PLAY.state && !playStateOk(PLAY.state, PLAY.seats)) { PLAY.state = null; }
+  function playStateOk(st, seats) {
+    try {
+      return st.v === 2 && Array.isArray(st.players) && st.players.length === st.n && Array.isArray(st.hands) && st.hands.length === st.n &&
+        Array.isArray(st.scores) && Array.isArray(st.history) && Array.isArray(st.trick) && !!SK.SCHEDULES[st.schedule] &&
+        ['bid', 'cannon', 'play', 'ability', 'roundEnd', 'over'].indexOf(st.phase) >= 0 && Array.isArray(seats) && seats.length === st.n;
+    } catch (e) { return false; }
+  }
   if (SFX) SFX.attach({
     visible: () => tab === 'play' && !document.hidden,
     root: () => $('#v-play'),
@@ -627,7 +649,8 @@
     let t;
     if (st.phase === 'bid') t = view.bidIn[p] ? (p === me ? String(st.bids[p]) : '✓') : '';
     else t = String(st.bids[p]);
-    const cannon = st.phase !== 'bid' && st.cannon && st.cannon[p] ? '<i class="cb" title="Cannonball"></i>' : '';
+    const cv = (view && view.cannon) || st.cannon; // the view hides others' picks until all are in
+    const cannon = st.phase !== 'bid' && st.phase !== 'cannon' && cv && cv[p] ?'<i class="cb" title="Cannonball"></i>' : '';
     return `<span class="tbl-token bidtok ${t ? '' : 'nobid'}" title="Bid">${t || '?'}${cannon}</span>`;
   }
   function tricksHTML(n) {
@@ -745,8 +768,25 @@
     });
     v.querySelectorAll('.gpile, .deckspot').forEach(el => TBL.deck(el, +el.dataset.deck, { cls: 'sk-back', badge: false, perCard: 0.2, max: 10 }));
     const handEl = v.querySelector('.hand');
-    const f = TBL.fan(handEl, handCards, { pick: false, lift: 16, spread: 0.6, arc: 0.8, maxRot: 12 });
-    tableFans.push(f);
+    // small cards (short screens) may spread wider than 0.6 of a card so each keeps a tap strip
+    const hcw = handEl ? parseFloat(getComputedStyle(handEl).getPropertyValue('--card-w')) || 76 : 76;
+    const fanOpts = { pick: false, lift: 16, spread: clamp((MIN_TAP + 2) / hcw, 0.6, 0.94), arc: 0.8, maxRot: 12 };
+    // A big hand on a narrow screen is held as two overlapping fans (back row
+    // shows its top edge), so every card keeps a strip wide enough to tap.
+    const rows = handRows(handEl, handCards.length, fanOpts);
+    let f;
+    if (rows === 2) {
+      const nb = Math.floor(handCards.length / 2);
+      handEl.classList.add('two');
+      handEl.innerHTML = '<div class="hrow back"></div><div class="hrow front"></div>';
+      const fb = TBL.fan(handEl.firstChild, handCards.slice(0, nb), fanOpts);
+      const ff = TBL.fan(handEl.lastChild, handCards.slice(nb), fanOpts);
+      tableFans.push(fb, ff);
+      f = { cards: fb.cards.concat(ff.cards) };
+    } else {
+      f = TBL.fan(handEl, handCards, fanOpts);
+      tableFans.push(f);
+    }
     TBL.scatter(v.querySelectorAll('.deckspot, .pad'), 'sk', { rot: 5, off: 1 });
     // A fresh deal: each card flies from the deck stack and turns over in your hand.
     if (dealing && f) {
@@ -760,10 +800,20 @@
     }
   }
 
+  // 1 or 2 rows: two when one fan would leave a card less than MIN_TAP px to tap.
+  const MIN_TAP = 42;
+  function handRows(handEl, n, o) {
+    if (!handEl || n < 6 || !TBL) return 1;
+    const cw = parseFloat(getComputedStyle(handEl).getPropertyValue('--card-w')) || 76;
+    const L = TBL.fanLayout(n, Object.assign({}, o, { width: handEl.clientWidth || 361, cardW: cw, cardH: cw * 7 / 5 }));
+    return L.length > 1 && L[1].step < MIN_TAP ? 2 : 1;
+  }
+
   function padSheet() {
     const st = PLAY.state;
     if (!st) return;
     openSheet(`<h3>Score pad</h3><div class="padsheet">${playSideHTML(st)}</div><div class="acts"><button class="btn" data-act="close-sheet">Close</button></div>`);
+    sheetKind = 'pad';
   }
 
   function playMessage(st, view) {
@@ -774,7 +824,7 @@
       return `${w.map(nm).join(' & ')} win${w.length === 1 && w[0] !== me ? 's' : ''}! <small>${st.scores.filter((_, p) => p !== st.ghost).join(' · ')}</small>`;
     }
     if (st.phase === 'bid') return `${R}<small>${view.bids[me] == null ? 'How many tricks will you take?' : 'Waiting for bids…'}</small>`;
-    if (st.phase === 'cannon') return `${R}<small>Cannonball or Grapeshot?</small>`;
+    if (st.phase === 'cannon') return `${R}<small>${st.cannonIn && st.cannonIn[me] ? 'Waiting for the others…' : 'Cannonball or Grapeshot?'}</small>`;
     if (st.phase === 'roundEnd') return `Round ${st.round} over<small>${resultLine(st)}</small>`;
     if (st.phase === 'ability') {
       const p = st.pending.seat, a = st.pending.ability;
@@ -785,7 +835,7 @@
     if (!st.trick.length && st.lastTrick) {
       const lt = st.lastTrick;
       sub = lt.winner == null ? (lt.how === 'kraken' ? 'Kraken! Nobody takes it' : 'The White Whale discards it')
-        : `${nm(lt.winner)} took it${lt.bonus ? ` (+${lt.bonus} bonus)` : ''}${lt.winner === st.ghost ? '' : ''}`;
+        : `${nm(lt.winner)} took it${lt.bonus && lt.winner !== st.ghost ? ` (+${lt.bonus} bonus)` : ''}`;
     }
     const whose = st.turn === me ? (st.trick.length ? 'Your turn' : 'Your lead') : `${nm(st.turn)}…`;
     return `${whose}<small>${sub || `Trick ${st.tricksDone + 1} of ${st.cards}`}</small>`;
@@ -822,7 +872,7 @@
       if (a === 'rosie') return `<span class="muted" style="font-size:13px">Who leads next?</span>` + st.players.map((pl, p) => (p === st.ghost ? '' : `<button class="btn sm" data-act="pl-ab" data-k="lead" data-v="${p}">${esc(p === me ? 'You' : pl.name)}</button>`)).join('');
       if (a === 'bendt') return `<span class="muted" style="font-size:13px">Pick ${st.pending.drawn.length} to discard</span><button class="btn primary sm" data-act="pl-ab-discard" ${PLAY.discard.length !== st.pending.drawn.length ? 'disabled' : ''}>Discard</button>`;
       if (a === 'rascal') return `<span class="muted" style="font-size:13px">Bet on your bid</span>` + [0, 10, 20].map(x => `<button class="btn sm" data-act="pl-ab" data-k="bet" data-v="${x}">${x}</button>`).join('');
-      if (a === 'harry') return `<span class="muted" style="font-size:13px">Bid ${st.bids[me]}, won ${st.won[me]}</span>` + [-1, 0, 1].map(x => `<button class="btn sm" data-act="pl-ab" data-k="delta" data-v="${x}">${x === 0 ? 'Keep' : (x > 0 ? '+1' : '−1')}</button>`).join('');
+      if (a === 'harry') return `<span class="muted" style="font-size:13px">Bid ${st.bids[me]}, won ${st.won[me]}</span>` + [-1, 0, 1].map(x => { const nb = st.bids[me] + x; return `<button class="btn sm" data-act="pl-ab" data-k="delta" data-v="${x}" ${nb < 0 || nb > st.cards ? 'disabled' : ''}>${x === 0 ? 'Keep' : (x > 0 ? '+1' : '−1')}</button>`; }).join('');
       if (a === 'juanita') {
         const und = view.undealt || [];
         return `<div style="display:flex;flex-wrap:wrap;gap:3px;justify-content:center;max-height:96px;overflow:auto">${und.map(id => face(id, 'xs')).join('') || '<span class="muted">No undealt cards</span>'}</div><button class="btn primary sm" data-act="pl-ab" data-k="ok" data-v="1">Done</button>`;
@@ -845,7 +895,7 @@
   function roundsTableHTML(st) {
     const seats = st.players.map((p, i) => i).filter(i => i !== st.ghost);
     const many = seats.length > 5; // 6+ players: short names so every column fits the side panel
-    const head = seats.map(p => `<th title="${esc(st.players[p].name)}">${esc(p === PLAY.me ? 'You' : st.players[p].name.slice(0, many ? 3 : 6))}</th>`).join('');
+    const head = seats.map(p => `<th title="${esc(st.players[p].name)}">${esc(p === PLAY.me ? 'You' : cut(st.players[p].name, many ? 3 : 6))}</th>`).join('');
     const rows = st.history.map(h => `<tr><td>${h.round}</td>${seats.map(p => `<td><span class="bt">${h.results[p].bid}/${h.results[p].won}</span><span class="${cls(h.results[p].pts)}">${sgn(h.results[p].pts)}</span></td>`).join('')}</tr>`).join('');
     return `<div class="rt-wrap ${seats.length > 5 ? 'many' : ''}"><table class="grid-table"><thead><tr><th>Rd</th>${head}</tr></thead><tbody>${rows}</tbody><tfoot><tr><td>Total</td>${seats.map(p => `<td>${neg(st.scores[p])}</td>`).join('')}</tr></tfoot></table></div>`;
   }
@@ -1050,7 +1100,7 @@
     if (!lt || (prev.lastTrick && prev.tricksDone === st.tricksDone && prev.round === st.round)) return;
     const nm = p => (p === PLAY.me ? 'You' : st.players[p].name);
     const cards = lt.plays.map(pl => `${esc(nm(pl.p))} ${esc(shortName(pl.id))}`).join(', ');
-    const res = lt.winner == null ? (lt.how === 'kraken' ? 'Kraken: nobody' : 'Whale: discarded') : `<b>${esc(nm(lt.winner))}</b> wins${lt.bonus ? ' +' + lt.bonus : ''}`;
+    const res = lt.winner == null ? (lt.how === 'kraken' ? 'Kraken: nobody' : 'Whale: discarded') : `<b>${esc(nm(lt.winner))}</b> wins${lt.bonus && lt.winner !== st.ghost ? ' +' + lt.bonus : ''}`;
     if (!PLAY.log) PLAY.log = [];
     PLAY.log.push(`${res} · ${cards}`);
     if (PLAY.log.length > 60) PLAY.log.shift();
@@ -1062,7 +1112,10 @@
       if (PLAY.netBusy || !NET) return false;
       PLAY.netBusy = true;
       const body = Object.assign({}, a); delete body.seat;
-      Promise.resolve(NET.act(body)).then(r => { if (!r.ok) { PLAY.netBusy = false; if (tab === 'play') renderPlay(); } });
+      const free = () => { PLAY.netBusy = false; if (tab === 'play') renderPlay(); };
+      Promise.resolve(NET.act(body)).then(r => { if (!r || !r.ok) free(); }, free);
+      // If the host never answers (refused, or its phone slept), taps work again after a while.
+      const g = PLAY.gen; setTimeout(() => { if (PLAY.netBusy && PLAY.gen === g) free(); }, 6000);
       return true;
     }
     const prev = PLAY.state;
@@ -1094,12 +1147,23 @@
       PLAY.fxPrev = null; PLAY.fxFrom = null;
     }
     if (!st) return;
-    if ((st.phase === 'roundEnd' || st.phase === 'over' || (PLAY.net && st.history.length)) && PLAY.shownRoundSheet !== st.history.length && tab === 'play') {
-      PLAY.shownRoundSheet = st.history.length;
-      setTimeout(() => { if (PLAY.state === st && tab === 'play') resultsSheet(); }, 700);
-    }
+    // An open score pad follows the game instead of showing an old score.
+    if (sheetOpen && sheetKind === 'pad' && tab === 'play') { const box = $('#sheet .padsheet'); if (box) box.innerHTML = playSideHTML(st); }
+    if (resultsDue()) setTimeout(showDueResults, 700);
     schedule();
     prepareStudy();
+  }
+  // A finished round's results pop up once. They never cover a question the
+  // player has open (e.g. "Leave this game?"); they wait until it is closed.
+  function resultsDue() {
+    const st = PLAY.state;
+    return !!st && tab === 'play' && PLAY.shownRoundSheet !== st.history.length &&
+      (st.phase === 'roundEnd' || st.phase === 'over' || !!(PLAY.net && st.history.length));
+  }
+  function showDueResults() {
+    if (!resultsDue() || (sheetOpen && sheetKind !== 'pad' && sheetKind !== 'results')) return;
+    PLAY.shownRoundSheet = PLAY.state.history.length;
+    resultsSheet();
   }
 
   // ?auto=1 in the URL: your seat is played by a medium computer and rounds
@@ -1180,8 +1244,22 @@
     PLAY.study.last = lost < 0.5 ? `Best bid <b>✓</b> (hits ${Math.round(mine.chance * 100)}%)` : `Best bid was <b>${best.bid}</b> ${sgn(best.avg)} · yours ${sgn(mine.avg)} · <span class="neg">−${Math.round(lost)}</span>`;
   }
 
+  // The hint takes a moment of simulation (seconds on a slow phone): show that it's
+  // working, and let extra taps do nothing instead of starting it again.
   function hint() {
-    const st = PLAY.state, me = PLAY.me;
+    const st = PLAY.state;
+    if (!st || PLAY.hintBusy || (PLAY.hint && PLAY.hintSeq === st.seq && PLAY.hintRound === st.round)) return;
+    PLAY.hintBusy = true;
+    const b = $('#v-play [data-act="pl-hint"]');
+    if (b) { b.textContent = 'Thinking…'; b.disabled = true; }
+    requestAnimationFrame(() => setTimeout(() => {
+      const now = PLAY.state; // online snapshots replace the object: compare the move count
+      try { if (now && now.seq === st.seq && now.round === st.round && (now.phase === 'bid' || now.phase === 'play')) { hintNow(now); PLAY.hintSeq = now.seq; PLAY.hintRound = now.round; } } finally { PLAY.hintBusy = false; }
+      if (tab === 'play') renderPlay();
+    }, 0));
+  }
+  function hintNow(st) {
+    const me = PLAY.me;
     if (st.phase === 'bid') {
       const acc = AI.bidStudy({ hand: st.hands[me], players: st.humans, before: AI.beforeCount(st, me), opts: st.opts, scoring: st.scoring, ghost: st.ghost >= 0, samples: 400 });
       const b = acc.bids[acc.best];
@@ -1195,7 +1273,6 @@
       for (const id in byId) { ev[id] = byId[id]; t[id] = hi > lo ? (byId[id] - lo) / (hi - lo) : 1; }
       PLAY.hint = { best: opts[0].id, bestAs: opts[0].as, ev, t };
     }
-    renderPlay();
   }
 
   function playAct(act, d, el) {
@@ -1242,7 +1319,7 @@
         if (NET && cur && !(cur.kind === d.k || (cur.kind === 'human' && d.k === 'empty'))) NET.setSeat(+d.i, d.k);
         return true;
       }
-      case 'pl-again': if (sheetOpen) closeSheet(); if (PLAY.net) { netLeave(); return true; } PLAY.gen++; clearTimeout(PLAY.timer); PLAY.state = null; save(); renderPlay(); return true;
+      case 'pl-again': if (sheetOpen) closeSheet(); if (PLAY.net) { netLeave(); return true; } PLAY.gen++; clearTimeout(PLAY.timer); PLAY.state = null; save(); renderPlay(); if (tab === 'settings') renderSettings(); return true;
       case 'pl-quit': {
         openSheet(`<h3>Leave this game?</h3><p class="muted" style="margin:0">${PLAY.net ? 'A computer takes your seat.' : 'The game is thrown away.'}</p><div class="acts"><button class="btn" data-act="close-sheet">Keep playing</button><button class="btn primary" data-act="pl-again">Leave</button></div>`);
         return true;
@@ -1348,7 +1425,7 @@
   document.addEventListener('input', e => {
     const n = e.target.dataset.name;
     if (n != null) { scSetupNames[+n] = e.target.value; }
-    if (e.target.hasAttribute('data-net-name')) { S.netName = e.target.value.slice(0, 20); save(); }
+    if (e.target.hasAttribute('data-net-name')) { S.netName = cut(e.target.value, 20); save(); }
     if (e.target.hasAttribute('data-net-code')) e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
   });
   document.addEventListener('change', e => {
@@ -1362,9 +1439,14 @@
     const t = e.state && e.state.tab;
     if (t && t !== tab) setTab(t, true);
   });
-  let lastW = window.innerWidth;
+  let lastW = window.innerWidth, resizeTimer = 0;
   window.addEventListener('resize', () => {
     if ((lastW >= 900) !== (window.innerWidth >= 900)) { renderTop(); render(); }
+    else if (lastW !== window.innerWidth && tab === 'play' && PLAY.state) {
+      // phone turned: the hand may need one row or two now
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => { if (tab === 'play' && PLAY.state) renderPlay(); }, 150);
+    }
     lastW = window.innerWidth;
   });
   document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
