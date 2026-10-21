@@ -1,7 +1,7 @@
 # Skull King: progress
 
 ## START HERE
-Read in this order: this file → `CLAUDE.md` → `docs/rules-check.md` (rules and sources) → `docs/ideas.md`. Last updated **2026-10-20** (first build + phase 2 + QA fixes + visual design pass + sounds/celebrations/animations + real-table Play screen + weird-scenario edge pass, assets ?v=7).
+Read in this order: this file → `CLAUDE.md` → `docs/rules-check.md` (rules and sources) → `docs/ideas.md`. Last updated **2026-10-20** (first build + phase 2 + QA fixes + visual design pass + sounds/celebrations/animations + real-table Play screen + weird-scenario edge pass, assets ?v=8).
 
 ## Goal right now
 A Skull King site for Tim's phone: a real-table scorekeeper and bid advisor (used most), plus the full game with exact rules against computers or friends online.
@@ -27,7 +27,7 @@ A Skull King site for Tim's phone: a real-table scorekeeper and bid advisor (use
 | Failure on the old code | Fix |
 |---|---|
 | 10-card hand: 27–33 px tap strips (phone/SE/landscape); Bendt's discards couldn't be picked from 11 cards | Hand goes to two rows when one row would be under 42 px per card; landscape stays one row (45–48 px); turning the phone re-lays it out |
-| Hint froze the screen 4–9 s with no feedback; double-tap computed twice | "Thinking…" at once, computed once |
+| Hint froze the screen 4–9 s with no feedback; double-tap computed twice; tapped while computers were still bidding, it showed nothing (each computer bid wiped it) | "Thinking…" at once, computed once; a bid hint survives the computers' bids |
 | Junk saved data (unknown schedule, broken play state or scoresheet) crashed screens | Validated on load and dropped |
 | Blank / null bid read as 0; emoji names cut in half | Engine refuses it; names cut by whole characters |
 | Harry −1 at bid 0 enabled but did nothing | Disabled |

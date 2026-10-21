@@ -1044,7 +1044,8 @@
       } else if (st.seq !== prev.seq || st.round !== prev.round) {
         if (st.tricksDone !== prev.tricksDone || st.round !== prev.round || st.history.length !== prev.history.length) logTrick(prev, st);
         if (st.round !== prev.round) onRoundStart();
-        PLAY.hint = null; PLAY.sel = null;
+        if (hintStale(prev, st)) PLAY.hint = null;
+        PLAY.sel = null;
         if (st.phase !== 'ability') PLAY.discard = [];
       }
     }
@@ -1125,7 +1126,8 @@
     PLAY.state = next;
     if (next.tricksDone !== prev.tricksDone || next.round !== prev.round || next.history.length !== prev.history.length) logTrick(prev, next);
     if (next.round !== prev.round) onRoundStart();
-    PLAY.hint = null; PLAY.sel = null;
+    if (hintStale(prev, next)) PLAY.hint = null;
+    PLAY.sel = null;
     if (next.phase !== 'ability') PLAY.discard = [];
     return true;
   }
@@ -1246,6 +1248,11 @@
 
   // The hint takes a moment of simulation (seconds on a slow phone): show that it's
   // working, and let extra taps do nothing instead of starting it again.
+  // Others' bids stay hidden until all are in, so a bid hint survives the
+  // computers bidding; any other move makes the hint out of date.
+  function hintStale(prev, next) {
+    return !(prev.phase === 'bid' && next.phase === 'bid' && prev.round === next.round);
+  }
   function hint() {
     const st = PLAY.state;
     if (!st || PLAY.hintBusy || (PLAY.hint && PLAY.hintSeq === st.seq && PLAY.hintRound === st.round)) return;
@@ -1254,7 +1261,7 @@
     if (b) { b.textContent = 'Thinking…'; b.disabled = true; }
     requestAnimationFrame(() => setTimeout(() => {
       const now = PLAY.state; // online snapshots replace the object: compare the move count
-      try { if (now && now.seq === st.seq && now.round === st.round && (now.phase === 'bid' || now.phase === 'play')) { hintNow(now); PLAY.hintSeq = now.seq; PLAY.hintRound = now.round; } } finally { PLAY.hintBusy = false; }
+      try { if (now && now.round === st.round && now.phase === st.phase && (now.phase === 'bid' || (now.phase === 'play' && now.seq === st.seq))) { hintNow(now); PLAY.hintSeq = now.seq; PLAY.hintRound = now.round; } } finally { PLAY.hintBusy = false; }
       if (tab === 'play') renderPlay();
     }, 0));
   }
