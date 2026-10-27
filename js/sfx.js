@@ -172,6 +172,21 @@
   const q = (sel) => { const r = env && env.root && env.root(); return r ? Array.from(r.querySelectorAll(sel)) : []; };
   // a player's place at the table (their seat, or the old score chip)
   const chip = p => q('.seatbox[data-seat="' + p + '"]')[0] || q('.chips .chip')[p] || null;
+  // Key moments (a capture, a big round of yours): the card or chip swells with a gold glow.
+  // Only when Animations is on and the phone isn't set to reduce motion.
+  const BIG_ROUND = 60;
+  const reducedMotion = () => { try { return !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { return false; } };
+  function spotlight(el, scale) {
+    if (!el || !el.animate || reducedMotion()) return;
+    stats.spotlights = (stats.spotlights || 0) + 1;
+    const s = scale || 1.35;
+    el.animate([
+      { transform: 'scale(1)', filter: 'drop-shadow(0 0 0 rgba(240,192,64,0))', zIndex: 5 },
+      { transform: 'scale(' + s + ')', filter: 'drop-shadow(0 0 14px rgba(240,192,64,.95))', zIndex: 5, offset: 0.35 },
+      { transform: 'scale(' + s + ')', filter: 'drop-shadow(0 0 10px rgba(240,192,64,.8))', zIndex: 5, offset: 0.7 },
+      { transform: 'scale(1)', filter: 'drop-shadow(0 0 0 rgba(240,192,64,0))', zIndex: 5 },
+    ], { duration: Math.round(900 * sp()), easing: 'cubic-bezier(.2,.8,.2,1)' });
+  }
   function anim(fn) { if (!animOn()) return; stats.anims++; try { fn(); } catch (e) { /* never break the game */ } }
   function flyIn(el, from, delay) {
     if (!el || !from || !el.animate) return;
@@ -230,6 +245,7 @@
         if (e.how === 'mermaid-king' && e.winner === me && me >= 0) {
           at(t1 + 150, () => F.celebrate({ kind: 'big', at: q('.trick')[0] || null, colors: env && env.colors ? env.colors([me]) : undefined }));
         }
+        if (e.capture) anim(() => { const w = q('.trick .tcard.win .cardf')[0]; if (w) at(t1, () => spotlight(w)); });
         anim(() => {
           if (e.winner == null) { const tr = q('.trick')[0]; if (tr && e.how) at(t1, () => F.shake(tr)); return; }
           const c = chip(e.winner);
@@ -257,6 +273,7 @@
             const from = e.before[p], to = e.totals[p];
             const fmt = n => { const v = Math.round(n); return v < 0 ? '−' + Math.abs(v) : String(v); };
             if (from !== to) { num.textContent = fmt(from); at(t2, () => F.countUp(num, from, to, { duration: 650, format: fmt })); }
+            if (p === me && r.made && r.pts >= BIG_ROUND) at(t2, () => { F.flash(c, 'var(--gold)'); spotlight(c, 1.25); });
             if (r.pts) at(t2, () => F.floatText(c, (r.pts > 0 ? '+' : '−') + Math.abs(Math.round(r.pts)), r.pts > 0 ? 'var(--good)' : 'var(--bad)'));
           });
         });

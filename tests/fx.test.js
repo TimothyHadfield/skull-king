@@ -181,6 +181,31 @@ test('Animations off: no animation runs; on: they do', () => {
   FX.set('animations', true);
 });
 
+test('a capture spotlights the winning card; not a plain trick, Animations off or reduced motion', () => {
+  // a stand-in table: the winning card in the trick, counting the swell animations it is asked for
+  let swells = [];
+  const card = { animate: (frames, o) => { swells.push(frames); return {}; }, getBoundingClientRect: () => ({ left: 0, top: 0, width: 50, height: 70 }) };
+  const fakeRoot = { querySelectorAll: sel => (sel === '.trick .tcard.win .cardf' ? [card] : []) };
+  SKFX.attach({ visible: () => true, root: () => fakeRoot, colors: () => ['#f0b354'] });
+  const reset = () => SKFX.attach({ visible: () => true, root: () => null, colors: () => ['#f0b354'] });
+  try {
+    FX.set('animations', true);
+    trickPair([[1, PIR], [2, KING], [0, num(1, 3)]], 0);
+    assert.equal(swells.length, 1, 'Skull King takes a pirate: the King swells');
+    assert.ok(/scale\(1\.3/.test(swells[0][1].transform), 'it grows by about a third');
+    swells = [];
+    trickPair([[1, num(1, 9)], [2, num(1, 4)], [0, num(1, 3)]], 0);
+    assert.equal(swells.length, 0, 'a plain trick: no spotlight');
+    FX.set('animations', false);
+    trickPair([[1, PIR], [2, KING], [0, num(1, 3)]], 0);
+    assert.equal(swells.length, 0, 'Animations off: no spotlight');
+    FX.set('animations', true);
+    globalThis.matchMedia = q => ({ matches: /reduce/.test(q) });
+    trickPair([[1, PIR], [2, KING], [0, num(1, 3)]], 0);
+    assert.equal(swells.length, 0, 'reduced motion: no spotlight');
+  } finally { delete globalThis.matchMedia; FX.set('animations', true); reset(); }
+});
+
 test('game over celebrates win for the winner and lose for the others', () => {
   celebrations = [];
   const { st } = playGame({}, 0, 21);
