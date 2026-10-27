@@ -281,7 +281,8 @@
 
   function scoreTableHTML(sc) {
     const n = sc.players.length;
-    const head = sc.players.map(nm => `<th title="${esc(nm)}">${esc(cut(nm, 8))}</th>`).join('');
+    const many = n > 5; // 6+ players: shorter names, bid/won stacked over the points
+    const head = sc.players.map(nm => `<th title="${esc(nm)}">${esc(cut(nm, many ? 5 : 8))}</th>`).join('');
     const body = sc.rounds.map((r, ri) => {
       if (!r.done && ri !== sc.cur) return '';
       const tds = sc.players.map((_, p) => {
@@ -298,7 +299,7 @@
     });
     const other = sc.scoring === 'rascal' ? 'sk' : 'rascal';
     const otherT = scTotals(sc, 99, other);
-    return `<table class="grid-table"><thead><tr><th>Rd</th>${head}</tr></thead><tbody>${body}</tbody>
+    return `<table class="grid-table ${many ? 'stack' : ''}"><thead><tr><th>Rd</th>${head}</tr></thead><tbody>${body}</tbody>
       <tfoot><tr><td>Total</td>${tot.map(x => `<td>${x}</td>`).join('')}</tr>
       <tr><td class="muted" style="font-weight:600">Hit rate</td>${hits.map(x => `<td class="muted" style="font-weight:600">${x}</td>`).join('')}</tr>
       <tr><td class="muted" style="font-weight:600">${other === 'sk' ? 'Standard' : 'Rascal'}</td>${otherT.map(x => `<td class="muted" style="font-weight:600">${x}</td>`).join('')}</tr></tfoot></table>`;
@@ -653,10 +654,12 @@
     const cannon = st.phase !== 'bid' && st.phase !== 'cannon' && cv && cv[p] ?'<i class="cb" title="Cannonball"></i>' : '';
     return `<span class="tbl-token bidtok ${t ? '' : 'nobid'}" title="Bid">${t || '?'}${cannon}</span>`;
   }
+  // Won tricks: a small squared-up pile of face-down cards, its count written on top
+  // so bids vs tricks can be read at a glance even with 8 players on a phone.
   function tricksHTML(n) {
     let h = '';
-    for (let j = 0; j < n; j++) h += `<i class="tbl-card tbl-back sk-back" style="--j:${j}"></i>`;
-    return `<span class="won" data-won="${n}" title="${n} trick${n === 1 ? '' : 's'} won">${h}</span>`;
+    for (let j = 0; j < Math.min(n, 4); j++) h += `<i class="tbl-card tbl-back sk-back" style="--j:${j}"></i>`;
+    return `<span class="won" data-won="${n}" title="${n} trick${n === 1 ? '' : 's'} won">${h}<b class="wn">${n}</b></span>`;
   }
   function plateHTML(st, p, me) {
     const nm = p === me ? 'You' : st.players[p].name;
@@ -689,9 +692,9 @@
     const trickHtml = showing.map((pl, i) => {
       const isNew = fresh && st.trick.length && i === st.trick.length - 1;
       const a = trickAnchor(pl.p, st, me);
-      const j = TBL ? TBL.jitter('t' + st.round + ':' + st.tricksDone, i, { rot: 10, off: 6 }) : { x: 0, y: 0, r: 0 };
+      const j = TBL ? TBL.jitter('t' + st.round + ':' + st.tricksDone, i, { rot: 10, off: 3 }) : { x: 0, y: 0, r: 0 };
       const tig = CARDS[pl.id].k === 'tig' ? `<span class="as">${pl.as === 'esc' ? 'Escape' : 'Pirate'}</span>` : '';
-      return `<div class="tcard ${winnerP === pl.p ? 'win' : ''} ${isNew && pl.p !== me ? 'turnin' : ''}" style="--ax:${a.x.toFixed(1)}%;--ay:${a.y.toFixed(1)};--jx:${j.x}px;--jy:${j.y}px;--r:${(a.r + j.r).toFixed(1)}deg">${face(pl.id, '', 'tbl-card' + (isNew ? ' drop' : ''))}${tig}</div>`;
+      return `<div class="tcard ${winnerP === pl.p ? 'win' : ''} ${isNew && pl.p !== me ? 'turnin' : ''}" data-p="${pl.p}" data-j="${(j.r * 0.3).toFixed(1)}" style="--ax:${a.x.toFixed(1)}%;--ay:${a.y.toFixed(1)};--jx:${j.x}px;--jy:${j.y}px;--r:${(a.r + j.r).toFixed(1)}deg">${face(pl.id, '', 'tbl-card' + (isNew ? ' drop' : ''))}${tig}</div>`;
     }).join('');
     const msg = playMessage(st, view);
     const actions = playActionsHTML(st, view);
@@ -751,6 +754,115 @@
       <div class="pl-side">${playSideHTML(st)}</div>
     </div>`;
     mountTable(v, handCards, dealing);
+    fitTrick(v, st, me);
+  }
+
+  // Size and place the trick to fill the felt: the biggest card that keeps every
+  // card inside the middle, clear of the deck and score pad, with each card's
+  // corner index showing, and every card under the seat of whoever played it.
+  // The size depends only on the screen and the player count, so it never jumps
+  // while a trick fills up. Two shapes are tried: your card below the others
+  // ('stack', tall felt) or in a gap in the middle of their row ('row', short felt).
+  function fitTrick(v, st, me) {
+    const mid = v.querySelector('.mid'), trick = v.querySelector('.trick');
+    if (!mid || !trick || !st) return;
+    const M = mid.getBoundingClientRect();
+    if (!M.width || !M.height) return;
+    const n = st.players.length, k = n - 1;
+    const pl = v.querySelector('.pl'), cs = getComputedStyle(pl);
+    const msg = mid.querySelector('.msg');
+    const mr = msg && msg.getBoundingClientRect();
+    const msgInside = mr && mr.height && mr.top < M.top + M.height / 2 && !mid.classList.contains('bidding');
+    const top0 = (msgInside ? Math.max(parseFloat(cs.getPropertyValue('--msgh')) || 42, mr.bottom - M.top + 9) : 2) + 2;
+    const obst = Array.from(mid.querySelectorAll('.deckspot, .pad')).map(e => e.getBoundingClientRect()).filter(r => r.width)
+      .map(r => ({ l: r.left - M.left - 6, r: r.right - M.left + 6, t: r.top - M.top - 6, b: r.bottom - M.top + 6 }));
+    const seatX = [];
+    for (let j = 1; j < n; j++) {
+      const s = v.querySelector(`.opps .seatbox[data-seat="${(me + j) % n}"]`);
+      const r = s && s.getBoundingClientRect();
+      seatX.push(r && r.width ? r.left + r.width / 2 - M.left : ((j - 0.5) / k) * M.width);
+    }
+    const maxTw = window.innerWidth >= 900 ? 132 : 104; // about the size of the cards in your hand
+    const hits = (x, y, w, h) => obst.some(o => x < o.r && x + w > o.l && y < o.b && y + h > o.t);
+    const fitMode = mode => { for (let tw = maxTw; tw >= 30; tw -= 2) { const L = place(mode, tw); if (L) return L; } return null; };
+    // 'stack' keeps every card right under its player's seat: use it unless the felt is
+    // so short that only the row shape keeps the cards readable.
+    let best = fitMode('stack');
+    const alt = k >= 2 && !best ? fitMode('row') : null;
+    if (alt && (!best || alt.tw > best.tw * 1.25)) best = alt;
+    function place(mode, tw) {
+      const h = tw * 1.4, drop = Math.min(h * 0.2, 14);
+      const meTop = mode === 'stack' ? top0 + h * 0.32 : top0 + drop; // their corner indexes stay above it
+      if (meTop + h > M.height - 2 || top0 + drop + h > M.height - 2) return null;
+      // the x range the row may use, away from the deck and pad where they sit level with it
+      let lo = tw / 2 + 14, hi = M.width - tw / 2 - 14;
+      obst.forEach(o => {
+        if (top0 + h + drop <= o.t) return;
+        if (o.r < M.width / 2) lo = Math.max(lo, o.r + tw / 2); else hi = Math.min(hi, o.l - tw / 2);
+      });
+      if (hi - lo < tw * 0.5) return null;
+      const cx = M.width / 2;
+      let xs;
+      if (mode === 'row') {
+        // opponents to your left fill the left side, those to your right the right side
+        // each card stays as near its seat as it can; only those that would sit on yours move aside
+        const gap = tw * 0.62, step = tw * 0.5, nl = Math.ceil(k / 2);
+        xs = seatX.map((x, i) => (i < nl ? Math.min(x, cx - gap - (nl - 1 - i) * step) : Math.max(x, cx + gap + (i - nl) * step)));
+        xs = xs.map((x, i) => (i < nl ? Math.max(x, lo + i * step) : Math.min(x, hi - (k - 1 - i) * step)));
+        for (let i = 1; i < k; i++) if (xs[i] - xs[i - 1] < tw * 0.45) return null;
+        if (xs[nl - 1] > cx - gap + 0.5 || (nl < k && xs[nl] < cx + gap - 0.5)) return null;
+      } else {
+        // right under each seat; only the outermost may be nudged in from the table's edge
+        const e0 = tw / 2 + 14, e1 = M.width - tw / 2 - 14;
+        xs = seatX.map(x => Math.min(e1, Math.max(e0, x)));
+        // an outer card that would land on the deck or pad (laptop: they sit low) moves in a little
+        const pitch = k > 1 ? (seatX[k - 1] - seatX[0]) / (k - 1) : M.width;
+        const y0 = x => top0 + drop * Math.pow(Math.min(1, Math.abs(x - cx) / (M.width / 2)), 2);
+        xs = xs.map((x, i) => {
+          obst.forEach(o => {
+            if (!hits(x - tw / 2, y0(x), tw, h)) return;
+            const nx = o.r < cx ? o.r + tw / 2 : o.l - tw / 2;
+            if (Math.abs(nx - x) <= pitch * 0.45) x = nx; // (x is already pulled in from the felt's edge)
+          });
+          return x;
+        });
+        const tight = () => xs.some((x, i) => i && x - xs[i - 1] < tw * 0.5);
+        if (tight() && k > 1) {
+          // seats reach past the felt (phone on its side: the actions take the right edge):
+          // spread the row evenly over the room there is, each card still near its seat
+          const a = Math.max(lo, seatX[0]), b = Math.min(hi, seatX[k - 1]);
+          xs = seatX.map(x => a + (b - a) * (x - seatX[0]) / ((seatX[k - 1] - seatX[0]) || 1));
+          if (xs.some((x, i) => Math.abs(x - seatX[i]) > pitch * 0.6)) return null;
+        }
+        if (tight()) return null;
+      }
+      const ys = xs.map(x => {
+        const d = Math.min(1, Math.abs(x - cx) / (M.width / 2));
+        let y = top0 + drop * d * d;
+        // an outer card slides down below the deck or pad above it rather than covering it
+        obst.forEach(o => { if (x - tw / 2 < o.r && x + tw / 2 > o.l && y < o.b && y + h > o.t && o.b + h <= M.height - 2) y = Math.max(y, o.b); });
+        return y;
+      });
+      // your card must not land on the deck or pad; nor may an opponent's
+      if (hits(cx - tw / 2, meTop, tw, h)) return null;
+      for (let i = 0; i < k; i++) if (hits(xs[i] - tw / 2, ys[i], tw, h) || ys[i] + h > M.height - 2) return null;
+      return { tw, h, xs, ys, meTop, mode };
+    }
+    if (!best) return;
+    trick.style.setProperty('--tw', best.tw + 'px');
+    trick.dataset.fit = best.mode;
+    trick.querySelectorAll('.tcard').forEach(el => {
+      const p = +el.dataset.p;
+      let x, y, z;
+      if (p === me) { x = M.width / 2; y = best.meTop; z = k + 1; }
+      else { const i = (p - me + n) % n - 1; x = best.xs[i]; y = best.ys[i]; z = i + 1; }
+      // gentle tilt only: a steep one would hide the corner index under the next card
+      const r = ((x - M.width / 2) / (M.width / 2)) * 4;
+      el.style.left = x.toFixed(1) + 'px';
+      el.style.top = (y + best.h / 2).toFixed(1) + 'px';
+      el.style.zIndex = z;
+      el.style.setProperty('--r', (r + (parseFloat(el.dataset.j) || 0)).toFixed(1) + 'deg');
+    });
   }
 
   function mountTable(v, handCards, dealing) {
@@ -897,7 +1009,7 @@
     const many = seats.length > 5; // 6+ players: short names so every column fits the side panel
     const head = seats.map(p => `<th title="${esc(st.players[p].name)}">${esc(p === PLAY.me ? 'You' : cut(st.players[p].name, many ? 3 : 6))}</th>`).join('');
     const rows = st.history.map(h => `<tr><td>${h.round}</td>${seats.map(p => `<td><span class="bt">${h.results[p].bid}/${h.results[p].won}</span><span class="${cls(h.results[p].pts)}">${sgn(h.results[p].pts)}</span></td>`).join('')}</tr>`).join('');
-    return `<div class="rt-wrap ${seats.length > 5 ? 'many' : ''}"><table class="grid-table"><thead><tr><th>Rd</th>${head}</tr></thead><tbody>${rows}</tbody><tfoot><tr><td>Total</td>${seats.map(p => `<td>${neg(st.scores[p])}</td>`).join('')}</tr></tfoot></table></div>`;
+    return `<div class="rt-wrap ${seats.length > 4 ? 'many' : ''}"><table class="grid-table"><thead><tr><th>Rd</th>${head}</tr></thead><tbody>${rows}</tbody><tfoot><tr><td>Total</td>${seats.map(p => `<td>${neg(st.scores[p])}</td>`).join('')}</tr></tfoot></table></div>`;
   }
 
   function resultsSheet() {
@@ -1449,7 +1561,10 @@
   let lastW = window.innerWidth, resizeTimer = 0;
   window.addEventListener('resize', () => {
     if ((lastW >= 900) !== (window.innerWidth >= 900)) { renderTop(); render(); }
-    else if (lastW !== window.innerWidth && tab === 'play' && PLAY.state) {
+    else if (lastW === window.innerWidth && tab === 'play' && PLAY.state) {
+      // only the height changed (browser bars): re-fit the trick to the new felt
+      const v = $('#v-play'); if (v) fitTrick(v, PLAY.state, PLAY.me);
+    } else if (lastW !== window.innerWidth && tab === 'play' && PLAY.state) {
       // phone turned: the hand may need one row or two now
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => { if (tab === 'play' && PLAY.state) renderPlay(); }, 150);
