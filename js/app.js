@@ -30,6 +30,7 @@
   // Sound & effects (js/fx.js shared library + js/sfx.js for this game). All optional:
   // the switches live in Settings. Buttons with their own sound skip the generic tap.
   const FXL = window.FX || null, SFX = window.SKFX || null;
+  const SKP = window.SKProfile || null, SKC = window.SKCoach || null; // My stats + guided first game / rules
   const fxPlay = (name, o) => (FXL ? FXL.play(name, o) : false);
   if (FXL) {
     FXL.init({ game: 'skull-king', clickSelector: 'button:not([data-act="sc-step"]):not([data-act="sc-bstep"]):not([data-act="sc-bet"]):not([data-act="pl-bid"]):not([data-act="sc-phase"]), [role="button"]' });
@@ -42,7 +43,8 @@
   function save() {
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
-      try { localStorage.setItem(KEY, JSON.stringify({ settings: S, score: SC, adv: { players: ADV.players, cards: ADV.cards, before: ADV.before, hand: ADV.hand, mode: ADV.mode }, play: PLAY.state && !PLAY.net ? { state: PLAY.state, seats: PLAY.seats, study: PLAY.study, log: (PLAY.log || []).slice(-30), roundHands: PLAY.roundHands, shown: PLAY.shownRoundSheet } : null, tab })); } catch (e) { /* storage full or blocked */ }
+      try { localStorage.setItem(KEY, JSON.stringify({ settings: S, score: SC, adv: { players: ADV.players, cards: ADV.cards, before: ADV.before, hand: ADV.hand, mode: ADV.mode }, play: PLAY.state && !PLAY.net ? { state: PLAY.state, seats: PLAY.seats, study: PLAY.study, log: (PLAY.log || []).slice(-30), roundHands: PLAY.roundHands, shown: PLAY.shownRoundSheet,
+        tricks: PLAY.tricks, undo: PLAY.undo, helped: PLAY.helped, daily: PLAY.daily, tutorial: PLAY.tutorial, recorded: PLAY.recorded } : null, record: RECORD, tab })); } catch (e) { /* storage full or blocked */ }
     }, 120);
   }
 
@@ -595,9 +597,23 @@
     roundHands: (saved.play && saved.play.roundHands) || null,
     shownRoundSheet: (saved.play && saved.play.shown) || 0,
     setup: null, gen: 0, timer: 0, me: 0, sel: null, hint: null, evalCache: null, bidCache: null, busy: false, discard: [],
+    // review, undo and My stats: every finished trick of this game, the state before your last move,
+    // whether Hint/Undo was used, today's Daily, the guided first game, and whether the result is counted
+    tricks: [], undo: null, helped: false, daily: null, tutorial: false, recorded: false,
   };
+  if (saved.play) {
+    const sp = saved.play;
+    PLAY.tricks = Array.isArray(sp.tricks) ? sp.tricks.filter(t => t && Array.isArray(t.plays)) : [];
+    PLAY.undo = sp.undo && sp.undo.state && playStateOk(sp.undo.state, sp.seats) ? sp.undo : null;
+    PLAY.helped = !!sp.helped; PLAY.tutorial = !!sp.tutorial; PLAY.recorded = !!sp.recorded;
+    PLAY.daily = sp.daily && typeof sp.daily.day === 'string' ? sp.daily : null;
+  }
   if (!PLAY.setup) PLAY.setup = [{ kind: 'you' }, { kind: 'cpu', level: 'medium' }, { kind: 'cpu', level: 'medium' }, { kind: 'cpu', level: 'hard' }];
-  if (PLAY.state && !playStateOk(PLAY.state, PLAY.seats)) { PLAY.state = null; }
+  if (PLAY.state && !playStateOk(PLAY.state, PLAY.seats)) { PLAY.state = null; PLAY.undo = null; }
+  // Your record across games (this device): rounds played, bids hit, best round.
+  const RECORD = Object.assign({ rounds: 0, hits: 0, best: null }, saved.record && typeof saved.record === 'object' ? saved.record : {});
+  ['rounds', 'hits'].forEach(k => { if (!(RECORD[k] >= 0)) RECORD[k] = 0; });
+  if (RECORD.best != null && !isFinite(RECORD.best)) RECORD.best = null;
   function playStateOk(st, seats) {
     try {
       return st.v === 2 && Array.isArray(st.players) && st.players.length === st.n && Array.isArray(st.hands) && st.hands.length === st.n &&
@@ -958,9 +974,15 @@
     return `You bid ${r.bid}, took ${r.won}: <b class="${cls(r.pts)}">${sgn(r.pts)}</b>`;
   }
 
+  function canUndo() { return !!PLAY.undo && !PLAY.net && !PLAY.daily; }
   function playActionsHTML(st, view) {
+    const h = playActionsInner(st, view);
+    const u = canUndo() && st.phase !== 'over' ? '<button class="btn sm ghost" data-act="pl-undo">Undo</button>' : '';
+    return u + h;
+  }
+  function playActionsInner(st, view) {
     const me = PLAY.me;
-    if (st.phase === 'over') return `<button class="btn" data-act="pl-results">Results</button><button class="btn primary" data-act="pl-again">New game</button>`;
+    if (st.phase === 'over') return `<button class="btn" data-act="pl-review">Review</button><button class="btn" data-act="pl-results">Results</button><button class="btn primary" data-act="pl-again">New game</button>`;
     if (st.phase === 'roundEnd') return `<button class="btn" data-act="pl-results">Results</button><button class="btn primary" data-act="pl-next">Next round</button>`;
     if (st.phase === 'bid' && view.bids[me] == null) {
       const hintBid = PLAY.hint && PLAY.hint.bid != null ? PLAY.hint.bid : -1;
@@ -1000,7 +1022,7 @@
     if (S.study && PLAY.study) {
       items.push(`<div class="panel" style="padding:12px"><div class="lbl" style="margin-bottom:6px">Study · points given up</div><div class="row" style="gap:18px"><div><div class="muted" style="font-size:12px">Bids</div><b class="num">${Math.round(PLAY.study.bidLost || 0)}</b></div><div><div class="muted" style="font-size:12px">Cards</div><b class="num">${Math.round(PLAY.study.playLost || 0)}</b></div></div></div>`);
     }
-    items.push(`<div class="panel scroll" style="padding:12px;flex:1"><div class="lbl" style="margin-bottom:6px">What happened</div><ul class="log">${log.map(l => `<li>${l}</li>`).join('')}</ul></div>`);
+    items.push(`<div class="panel scroll" style="padding:12px;flex:1"><div class="lbl" style="margin-bottom:6px">What happened</div><ul class="log">${log.map(l => `<li>${l}</li>`).join('') || '<li class="muted">Each trick shows up here as it is taken.</li>'}</ul></div>`);
     return items.join('');
   }
 
@@ -1033,9 +1055,36 @@
     const w = SK.winners(st);
     openSheet(`<h3>${over ? `${w.map(p => (p === PLAY.me ? 'You' : st.players[p].name)).join(' & ')} win${w.length === 1 && w[0] !== PLAY.me ? 's' : ''}!` : `Round ${h.round} results`}</h3>
       <table class="res-table"><thead><tr><th>Player</th><th>Bid</th><th>Won</th><th>Bonus</th><th>Round</th><th>Total</th></tr></thead><tbody>${rows}</tbody></table>
-      ${lost}${reveal}
-      <div class="acts"><button class="btn" data-act="close-sheet">Close</button>${over ? `<button class="btn primary" data-act="pl-again">${PLAY.net ? 'Leave room' : 'New game'}</button>` : st.phase === 'roundEnd' ? '<button class="btn primary" data-act="pl-next">Next round</button>' : ''}</div>`);
+      ${lost}${reveal}${over && !PLAY.net && RECORD.rounds ? recordLine() : ''}
+      <div class="acts"><button class="btn" data-act="close-sheet">Close</button>${PLAY.tricks.some(t => t.r === h.round) ? `<button class="btn" data-act="pl-review" data-r="${h.round}">Review</button>` : ''}${over ? `<button class="btn primary" data-act="pl-again">${PLAY.net ? 'Leave room' : 'New game'}</button>` : st.phase === 'roundEnd' ? '<button class="btn primary" data-act="pl-next">Next round</button>' : ''}</div>`);
     sheetKind = 'results';
+  }
+
+  // Your record on this device, shown when a game ends: bids hit and best round.
+  function recordLine() {
+    return `<p class="muted rec-line" style="margin:0">Your record: bids hit <b>${Math.round(100 * RECORD.hits / RECORD.rounds)}%</b> of ${RECORD.rounds} round${RECORD.rounds === 1 ? '' : 's'} · best round <b>${sgn(RECORD.best || 0)}</b></p>`;
+  }
+  // Review: every trick of a round, card by card, the winner's card ringed in gold.
+  // Opens from the results sheet and at the end of the game; ‹ › step through the rounds.
+  function reviewSheet(round) {
+    const st = PLAY.state;
+    if (!st) return;
+    const rounds = Array.from(new Set(PLAY.tricks.map(t => t.r))).sort((a, b) => a - b);
+    if (!rounds.length) { toast('No tricks to review yet'); return; }
+    const r = rounds.indexOf(+round) >= 0 ? +round : rounds[rounds.length - 1];
+    const i = rounds.indexOf(r);
+    const nm = p => (p === PLAY.me ? 'You' : st.players[p].name);
+    const hist = st.history.find(x => x.round === r);
+    const rows = PLAY.tricks.filter(t => t.r === r).map((t, k) => {
+      const cards = t.plays.map(pl => `<div class="rv-c ${pl.p === t.w ? 'win' : ''}"><span class="rv-nm" style="color:${PLAYER_COLORS[pl.p % 8]}">${esc(cut(nm(pl.p), 5))}</span>${face(pl.id, 'rv')}${CARDS[pl.id].k === 'tig' ? `<span class="rv-as">${pl.as === 'esc' ? 'Escape' : 'Pirate'}</span>` : ''}</div>`).join('');
+      const res = t.w == null ? (t.how === 'kraken' ? 'Kraken: nobody' : 'Whale: discarded') : `<b>${esc(nm(t.w))}</b>${t.bonus && t.w !== st.ghost ? ` <span class="pos">+${t.bonus}</span>` : ''}`;
+      return `<div class="rv-trick"><div class="rv-head"><span class="muted">Trick ${t.n || k + 1}</span><span>${res}</span></div><div class="rv-cs">${cards}</div></div>`;
+    }).join('');
+    const bids = hist ? `<div class="rv-bids">${st.players.map((pl, p) => (p === st.ghost || !hist.results[p] ? '' : `<span><b style="color:${PLAYER_COLORS[p % 8]}">${esc(cut(nm(p), 6))}</b> ${hist.results[p].bid}/${hist.results[p].won} <span class="${cls(hist.results[p].pts)}">${sgn(hist.results[p].pts)}</span></span>`)).join('')}</div>` : '';
+    openSheet(`<div class="rv-top"><button class="btn sm" data-act="pl-review" data-r="${rounds[i - 1]}" ${i > 0 ? '' : 'disabled'} aria-label="Previous round">‹</button><h3>Round ${r} review</h3><button class="btn sm" data-act="pl-review" data-r="${rounds[i + 1]}" ${i < rounds.length - 1 ? '' : 'disabled'} aria-label="Next round">›</button></div>
+      ${bids}<div class="review scroll">${rows}</div>
+      <div class="acts"><button class="btn" data-act="close-sheet">Close</button></div>`);
+    sheetKind = 'review';
   }
 
   function playSetupHTML() {
@@ -1053,6 +1102,8 @@
       <div class="row"><button class="btn grow" data-act="pl-add" ${PLAY.setup.length >= 8 ? 'disabled' : ''}>Add computer</button><button class="btn primary grow" data-act="pl-start">Deal</button></div>
       <div class="row muted" style="font-size:12.5px;gap:6px">Easy plays by feel · Medium counts cards · Hard simulates <span style="margin-left:auto;white-space:nowrap">How strong?</span> ${q('strength')}</div>
       ${PLAY.setup.length === 2 && S.ghost ? `<div class="muted" style="font-size:12.5px">Two players: Graybeard's ghost hand joins. ${q('ghost')}</div>` : ''}
+      ${window.Profile ? `<div class="row pl-more"><button class="btn sm grow pf-open" data-act="pl-stats">${window.Profile.avatarSVG(window.Profile.avatar, 22)}My stats</button><button class="btn sm grow" data-act="pl-daily">${dailyDone() ? 'Daily ✓' : 'Daily game'}</button>${window.COACH ? '<button class="btn sm grow" data-act="pl-rules">Rules</button>' : ''}</div>` : ''}
+
       <div class="panel net-box">
         <div class="row" style="justify-content:space-between"><div class="lbl">Play online</div>${q('online')}</div>
         <input type="text" class="net-in" data-net-name maxlength="20" placeholder="Your name" value="${esc(S.netName || '')}" aria-label="Your name" autocomplete="nickname">
@@ -1150,6 +1201,7 @@
       PLAY.state = st;
       if (!prev) {
         PLAY.gen++; PLAY.log = []; PLAY.hint = null; PLAY.sel = null; PLAY.discard = [];
+        PLAY.tricks = []; PLAY.undo = null; PLAY.helped = false; PLAY.recorded = false; PLAY.daily = null; PLAY.tutorial = false;
         PLAY.study = { bidLost: 0, playLost: 0, rBid: 0, rPlay: 0, round: st.round, last: '' };
         PLAY.shownRoundSheet = st.history.length;
         onRoundStart();
@@ -1188,12 +1240,23 @@
   }
 
   // ---- game flow
-  function startGame() {
-    const seats = PLAY.setup.map((s, i) => (s.kind === 'you' ? { kind: 'you' } : { kind: 'cpu', level: s.level }));
+  // kind: '' (your own table and rules), 'daily' (today's deals for everyone: standard rules, 3 Medium)
+  // or 'tutorial' (the guided first game: fixed deals, 3 Easy, standard rules).
+  function startGame(kind, daily) {
+    if (window.COACH) COACH.closeOffer();
+    const special = kind === 'daily' || kind === 'tutorial';
+    const setup = special ? [{ kind: 'you' }].concat([1, 2, 3].map(() => ({ kind: 'cpu', level: kind === 'daily' ? SKP.DAILY.level : 'easy' }))) : PLAY.setup;
+    const seats = setup.map((s, i) => (s.kind === 'you' ? { kind: 'you' } : { kind: 'cpu', level: s.level }));
     const players = seats.map((s, i) => ({ name: s.kind === 'you' ? 'You' : CPU_NAMES[(i - 1) % 7], kind: s.kind === 'you' ? 'human' : 'cpu', level: s.level || null }));
-    PLAY.state = SK.newGame({ players, opts: { kraken: S.kraken, whale: S.whale, loot: S.loot }, scoring: S.scoring, cannonball: S.cannonball,
-      abilities: S.abilities, schedule: S.schedule, ghost: S.ghost, firstDealer: Math.floor(Math.random() * players.length) });
+    const cfg = special ? { players, opts: {}, scoring: 'sk', schedule: 'standard', ghost: true } :
+      { players, opts: { kraken: S.kraken, whale: S.whale, loot: S.loot }, scoring: S.scoring, cannonball: S.cannonball, abilities: S.abilities, schedule: S.schedule, ghost: S.ghost };
+    if (kind === 'daily') { cfg.seed = daily.seed; cfg.firstDealer = daily.seed % 4; }
+    else if (kind === 'tutorial') { cfg.seed = SKC.SEED; cfg.firstDealer = SKC.DEALER; }
+    else cfg.firstDealer = Math.floor(Math.random() * players.length);
+    PLAY.state = SK.newGame(cfg);
     PLAY.seats = PLAY.state.players.map((p, i) => (p.kind === 'ghost' ? { kind: 'ghost' } : seats[i]));
+    PLAY.daily = kind === 'daily' ? daily : null; PLAY.tutorial = kind === 'tutorial';
+    PLAY.tricks = []; PLAY.undo = null; PLAY.helped = false; PLAY.recorded = false;
     PLAY.me = 0; PLAY.gen++; PLAY.log = []; PLAY.hint = null; PLAY.sel = null; PLAY.discard = [];
     PLAY.study = { bidLost: 0, playLost: 0, rBid: 0, rPlay: 0, round: 1, last: '' };
     PLAY.shownRoundSheet = 0;
@@ -1217,6 +1280,7 @@
     if (!PLAY.log) PLAY.log = [];
     PLAY.log.push(`${res} · ${cards}`);
     if (PLAY.log.length > 60) PLAY.log.shift();
+    PLAY.tricks.push({ r: st.round, n: lt.n, plays: lt.plays.map(pl => (pl.as ? { p: pl.p, id: pl.id, as: pl.as } : { p: pl.p, id: pl.id })), w: lt.winner, how: lt.how, bonus: lt.bonus || 0 });
   }
 
   function applyAction(a) {
@@ -1244,6 +1308,94 @@
     return true;
   }
 
+  // ---- Undo (vs computers only, not in the Daily): the table as it was before your last move.
+  function snapUndo() {
+    if (PLAY.net || PLAY.daily || !PLAY.state) return;
+    PLAY.undo = { state: PLAY.state, log: (PLAY.log || []).slice(), tricks: PLAY.tricks.length, study: PLAY.study ? JSON.parse(JSON.stringify(PLAY.study)) : null };
+  }
+  function myMove(a) {
+    const prev = PLAY.undo;
+    snapUndo();
+    if (!applyAction(a)) PLAY.undo = prev;
+  }
+  function undo() {
+    const u = PLAY.undo;
+    if (!u || !canUndo()) return;
+    PLAY.gen++; clearTimeout(PLAY.timer);
+    if (sheetOpen && sheetKind === 'results') closeSheet();
+    PLAY.shownRoundSheet = Math.min(PLAY.shownRoundSheet, u.state.history.length); // the round's results show again when it ends again
+    PLAY.state = u.state; PLAY.log = u.log; PLAY.tricks.length = Math.min(PLAY.tricks.length, u.tricks);
+    if (u.study) PLAY.study = u.study;
+    PLAY.undo = null; PLAY.helped = true; PLAY.hint = null; PLAY.sel = null; PLAY.discard = [];
+    PLAY.trickKey = null; PLAY.lastSeq = u.state.seq; // put the trick back without flying it anywhere
+    afterChange();
+  }
+
+  // ---- My stats (js/profile.js + js/skprofile.js): one result per game vs computers.
+  // A game left before the end counts as a loss; Hint or Undo makes it "with help" (not rated).
+  function recordGame() {
+    const st = PLAY.state;
+    if (!st || PLAY.recorded || PLAY.net || PLAY.tutorial) return;
+    PLAY.recorded = true;
+    const sum = SKP ? SKP.summary(st, PLAY.me, PLAY.tricks) : null;
+    if (sum && sum.rounds) {
+      RECORD.rounds += sum.rounds; RECORD.hits += sum.hits;
+      RECORD.best = RECORD.best == null ? sum.best : Math.max(RECORD.best, sum.best);
+    }
+    if (window.Profile && SKP) {
+      try {
+        window.Profile.recordResult(SKP.result({ st, me: PLAY.me, levels: PLAY.seats.filter(s => s.kind === 'cpu').map(s => s.level), helped: PLAY.helped, daily: !!PLAY.daily, tricks: PLAY.tricks }));
+      } catch (e) { /* the stats never stop the game */ }
+    }
+    save();
+  }
+  function dailyDone() {
+    try { return !!(window.Profile && window.Profile.daily.played()); } catch (e) { return false; }
+  }
+  function startDaily() {
+    const P = window.Profile;
+    if (!P || !SKP) return;
+    if (PLAY.net) { toast('Leave the online room first'); return; }
+    if (dailyDone()) { openStats('daily'); return; }
+    if (PLAY.state && PLAY.state.phase !== 'over') { toast('Finish or leave this game first'); return; }
+    if (P.isOpen()) P.closePanel();
+    const day = P.daily.date();
+    if (tab !== 'play') setTab('play');
+    startGame('daily', { day, seed: (P.daily.seed(day, 'skull-king') >>> 0) % 2147483646 + 1 });
+  }
+  let modal = '';
+  function modalOpened(k) { modal = k; history.pushState({ modal: k }, ''); }
+  function modalClosed() { if (!modal) return; modal = ''; try { history.back(); } catch (e) { /* ignore */ } }
+  function openStats(t) {
+    if (!window.Profile || !SKP) return;
+    if (sheetOpen) closeSheet();
+    window.Profile.openPanel(t ? { tab: t } : undefined);
+    if (window.Profile.isOpen()) modalOpened('profile');
+  }
+  function openRules() {
+    if (!window.COACH || !SKC) return;
+    if (sheetOpen) closeSheet();
+    COACH.rules(Object.assign({}, SKC.RULES, { onClose: () => { if (modal === 'rules') modalClosed(); } }));
+    modalOpened('rules');
+  }
+  let tour = null;
+  function startTutorial() {
+    if (!tour) return;
+    if (PLAY.net) { toast('Leave the online room first'); return; }
+    if (PLAY.state && PLAY.state.phase !== 'over' && !PLAY.tutorial) recordGame(); // leaving a game counts as a loss
+    tour.reset();
+    if (tab !== 'play') setTab('play');
+    startGame('tutorial');
+    tour.start(0);
+  }
+  function offerTutorial() {
+    if (!window.COACH || !SKC || !tour || PLAY.state || PLAY.net || tab !== 'play' || COACH.offered(SKC.ID)) return;
+    setTimeout(() => {
+      if (PLAY.state || PLAY.net || tab !== 'play') return;
+      COACH.offer({ id: SKC.ID, title: 'New to Skull King?', text: 'Play one guided round against Easy computers.', yes: 'Teach me', no: 'No thanks', onYes: startTutorial });
+    }, 400);
+  }
+
   function delay() {
     const st = PLAY.state;
     const fast = S.speed === 'fast';
@@ -1261,6 +1413,9 @@
       PLAY.fxPrev = null; PLAY.fxFrom = null;
     }
     if (!st) return;
+    // Undo reaches back only within the round being played (up to its results, before Next round).
+    if (PLAY.undo && (st.phase === 'over' || st.round !== PLAY.undo.state.round)) PLAY.undo = null;
+    if (st.phase === 'over' && !PLAY.net) recordGame();
     // An open score pad follows the game instead of showing an old score.
     if (sheetOpen && sheetKind === 'pad' && tab === 'play') { const box = $('#sheet .padsheet'); if (box) box.innerHTML = playSideHTML(st); }
     if (resultsDue()) setTimeout(showDueResults, 700);
@@ -1400,32 +1555,38 @@
       case 'pl-level': PLAY.setup[+d.i].level = d.l; renderPlay(); return true;
       case 'pl-add': PLAY.setup.push({ kind: 'cpu', level: 'medium' }); renderPlay(); return true;
       case 'pl-del': PLAY.setup.splice(+d.i, 1); renderPlay(); return true;
-      case 'pl-start': startGame(); return true;
-      case 'pl-bid': studyAfterBid(+d.b); applyAction({ type: 'bid', seat: me, bid: +d.b }); afterChange(); return true;
-      case 'pl-cannon': applyAction({ type: 'cannon', seat: me, on: d.on === '1' }); afterChange(); return true;
+      case 'pl-start': startGame(''); return true;
+      case 'pl-bid': studyAfterBid(+d.b); myMove({ type: 'bid', seat: me, bid: +d.b }); afterChange(); return true;
+      case 'pl-cannon': myMove({ type: 'cannon', seat: me, on: d.on === '1' }); afterChange(); return true;
+      case 'pl-undo': undo(); return true;
+      case 'pl-review': reviewSheet(d.r); return true;
+      case 'pl-stats': openStats(); return true;
+      case 'pl-daily': startDaily(); return true;
+      case 'pl-rules': openRules(); return true;
+      case 'pl-tutorial': startTutorial(); return true;
       case 'pl-card': {
         if (!(st.phase === 'play' && st.turn === me)) { if (st.phase === 'play' && SFX) SFX.illegal(el); return true; }
         const id = +el.dataset.id;
         if (SK.legalPlays(st, me).indexOf(id) < 0) { if (SFX) SFX.illegal(el); toast('Follow the suit that was led'); return true; }
         if (CARDS[id].k === 'tig') { PLAY.sel = id; renderPlay(); return true; }
         PLAY.fxFrom = el.getBoundingClientRect(); // the card flies from here to the table
-        studyAfterPlay({ id }); applyAction({ type: 'play', seat: me, card: id }); afterChange(); return true;
+        studyAfterPlay({ id }); myMove({ type: 'play', seat: me, card: id }); afterChange(); return true;
       }
       case 'pl-tig': { const id = PLAY.sel; studyAfterPlay({ id, as: d.as });
-        const src = document.querySelector(`#v-play .hand [data-id="${id}"]`); if (src) PLAY.fxFrom = src.getBoundingClientRect(); applyAction({ type: 'play', seat: me, card: id, as: d.as }); afterChange(); return true; }
+        const src = document.querySelector(`#v-play .hand [data-id="${id}"]`); if (src) PLAY.fxFrom = src.getBoundingClientRect(); myMove({ type: 'play', seat: me, card: id, as: d.as }); afterChange(); return true; }
       case 'pl-unsel': PLAY.sel = null; renderPlay(); return true;
-      case 'pl-hint': hint(); return true;
+      case 'pl-hint': if (!PLAY.net) { PLAY.helped = true; save(); } hint(); return true;
       case 'pl-ab': {
         const body = { type: 'ability', seat: me };
         if (d.k !== 'ok') body[d.k] = +d.v;
-        applyAction(body); afterChange(); return true;
+        myMove(body); afterChange(); return true;
       }
       case 'pl-discard': {
         const id = +el.dataset.id, i = PLAY.discard.indexOf(id);
         if (i >= 0) PLAY.discard.splice(i, 1); else if (PLAY.discard.length < st.pending.drawn.length) PLAY.discard.push(id);
         renderPlay(); return true;
       }
-      case 'pl-ab-discard': applyAction({ type: 'ability', seat: me, discard: PLAY.discard.slice() }); afterChange(); return true;
+      case 'pl-ab-discard': myMove({ type: 'ability', seat: me, discard: PLAY.discard.slice() }); afterChange(); return true;
       case 'pl-next': if (sheetOpen) closeSheet(); if (PLAY.state.phase === 'roundEnd') { applyAction({ type: 'next' }); afterChange(); } return true;
       case 'pl-results': resultsSheet(); return true;
       case 'pl-pad': padSheet(); return true;
@@ -1438,9 +1599,9 @@
         if (NET && cur && !(cur.kind === d.k || (cur.kind === 'human' && d.k === 'empty'))) NET.setSeat(+d.i, d.k);
         return true;
       }
-      case 'pl-again': if (sheetOpen) closeSheet(); if (PLAY.net) { netLeave(); return true; } PLAY.gen++; clearTimeout(PLAY.timer); PLAY.state = null; save(); renderPlay(); if (tab === 'settings') renderSettings(); return true;
+      case 'pl-again': if (sheetOpen) closeSheet(); if (PLAY.net) { netLeave(); return true; } recordGame(); PLAY.gen++; PLAY.undo = null; clearTimeout(PLAY.timer); PLAY.state = null; save(); renderPlay(); if (tab === 'settings') renderSettings(); return true;
       case 'pl-quit': {
-        openSheet(`<h3>Leave this game?</h3><p class="muted" style="margin:0">${PLAY.net ? 'A computer takes your seat.' : 'The game is thrown away.'}</p><div class="acts"><button class="btn" data-act="close-sheet">Keep playing</button><button class="btn primary" data-act="pl-again">Leave</button></div>`);
+        openSheet(`<h3>Leave this game?</h3><p class="muted" style="margin:0">${PLAY.net ? 'A computer takes your seat.' : PLAY.tutorial ? 'The guided game is thrown away.' : 'The game is thrown away. It counts as a loss in My stats.'}</p><div class="acts"><button class="btn" data-act="close-sheet">Keep playing</button><button class="btn primary" data-act="pl-again">Leave</button></div>`);
         return true;
       }
     }
@@ -1471,7 +1632,11 @@
       </div>
       ${FXL ? '<div class="set-group"><h3>Sound &amp; effects</h3><div id="fxSet"></div></div>' : ''}
       <div class="set-group"><h3>How strong are the computers? ${q('strength')}</h3><div style="padding:4px 14px 12px">${strengthNote()}</div></div>
-      <div class="set-group"><details class="rules"><summary>How Skull King works ›</summary><div class="rules-body">${RULES_HTML}</div></details></div>
+      ${window.COACH && SKC ? `<div class="set-group"><h3>Learn</h3>
+        <div class="set-row"><div class="t">How Skull King works</div><button class="btn sm" data-act="pl-rules">Rules</button></div>
+        <div class="set-row"><div class="t">Guided first game</div><button class="btn sm" data-act="pl-tutorial">Replay tutorial</button></div>
+        ${window.Profile && SKP ? '<div class="set-row"><div class="t">Wins, levels, awards, Daily</div><button class="btn sm" data-act="pl-stats">My stats</button></div>' : ''}</div>`
+        : `<div class="set-group"><details class="rules"><summary>How Skull King works ›</summary><div class="rules-body">${RULES_HTML}</div></details></div>`}
       <div class="set-group"><div class="set-row"><div class="t"><a href="../">More board &amp; card games</a></div><span class="muted" style="font-size:12px">v${VERSION}</span></div></div>
     </div></div>`;
     if (FXL && $('#fxSet')) FXL.renderSettings($('#fxSet'));
@@ -1498,7 +1663,9 @@
   }
 
   // ============================================================ TABS
-  let tab = ['score', 'bid', 'play', 'settings'].indexOf(saved.tab) >= 0 ? saved.tab : 'score';
+  // The site opens on Play. Only a scoresheet still being kept for a real-table
+  // game brings you back to Score (where you left it).
+  let tab = saved.tab === 'score' && SC && !scFinished(SC) ? 'score' : 'play';
   function setTab(t, fromPop) {
     if (sheetOpen) closeSheet(fromPop);
     $('#pop').hidden = true;
@@ -1509,6 +1676,7 @@
     renderTop();
     render();
     save();
+    if (window.COACH) { if (t === 'play') offerTutorial(); else COACH.closeOffer(); }
   }
   function render() {
     if (tab === 'score') renderScore();
@@ -1554,6 +1722,12 @@
     if (sk) { S[sk] = e.target.value; save(); renderSettings(); }
   });
   window.addEventListener('popstate', e => {
+    if (modal) {
+      const k = modal; modal = '';
+      if (k === 'rules' && window.COACH && COACH.rulesOpen()) COACH.closeRules();
+      if (k === 'profile' && window.Profile && window.Profile.isOpen()) window.Profile.closePanel();
+      return;
+    }
     if (sheetOpen) { closeSheet(true); return; }
     const t = e.state && e.state.tab;
     if (t && t !== tab) setTab(t, true);
@@ -1579,13 +1753,39 @@
   if (Art) document.documentElement.style.setProperty('--skback', `url("data:image/svg+xml,${encodeURIComponent(Art.back()).replace(/'/g, '%27')}")`);
   // A reload while a sheet was open leaves a stale sheet entry in history: step
   // off it so the next Back really goes back.
-  if (history.state && history.state.sheet) history.back();
+  if (history.state && (history.state.sheet || history.state.modal)) history.back();
   else history.replaceState({ tab }, '');
+  // My stats, Daily game, rules sheet and the guided first game (shared kits; all optional).
+  if (SKP) SKP.init(startDaily);
+  if (window.Profile) window.Profile.onChange(what => {
+    if (what === 'close' && modal === 'profile') modalClosed();
+    if ((what === 'result' || what === 'me' || what === 'import' || what === 'reset') && tab === 'play' && !PLAY.state) renderPlay();
+  });
+  if (window.COACH && SKC) {
+    tour = COACH.tour({
+      id: SKC.ID,
+      steps: SKC.steps({ state: () => PLAY.state }),
+      pauseIf: () => tab !== 'play' || sheetOpen || !PLAY.state || !PLAY.tutorial || !!PLAY.net || (window.Profile && window.Profile.isOpen()) || COACH.rulesOpen(),
+    });
+    new MutationObserver(() => COACH.update()).observe($('#sheetBack'), { attributes: true, attributeFilter: ['hidden'] });
+    new MutationObserver(() => COACH.update()).observe($('#v-play'), { childList: true });
+  }
   setTab(tab, true);
+  if (tour && PLAY.tutorial && PLAY.state && tour.saved()) tour.resume();
+  // A new deploy reloads the page by itself only when nothing would be lost.
+  if (window.PWA) window.PWA.safeToReload = () => {
+    if (PLAY.net || sheetOpen || modal || PLAY.hintBusy) return false;
+    if ((window.COACH && COACH.rulesOpen()) || (window.Profile && window.Profile.isOpen())) return false;
+    const a = document.activeElement;
+    if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return false;
+    if (PLAY.tutorial && PLAY.state) return false;
+    // a game in progress is saved, but only the Play tab shows it moving: reload only away from it
+    return !PLAY.state || PLAY.state.phase === 'over' || tab !== 'play';
+  };
   // Back in an online room after a reload (only loads Firebase if a room was open).
   if (/[?&]netlocal=1/.test(location.search)) netLocalTest();
   else try { if (localStorage.getItem(NET_KEY) && window.SKGame) netResume(); } catch (e) { /* storage blocked */ }
 
   // for scripted checks
-  window.App = { get play() { return PLAY; }, get score() { return SC; }, get adv() { return ADV; }, settings: S, setTab };
+  window.App = { get play() { return PLAY; }, get score() { return SC; }, get adv() { return ADV; }, get tab() { return tab; }, get record() { return RECORD; }, settings: S, setTab, startGame, startDaily, startTutorial, undo, reviewSheet };
 })();

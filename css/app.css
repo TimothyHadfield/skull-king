@@ -472,3 +472,27 @@ a { color: var(--accent); }
 .fx-still .cardf.deal, .fx-still .cardf.drop, .fx-still .tcard.turnin .cardf { animation: none; }
 .fx-still .cardf.deal::before, .fx-still .tcard.turnin .cardf::before { display: none; }
 @media (prefers-reduced-motion: reduce) { .hand .cardf.deal, .tcard.turnin .cardf { animation: none; } .hand .cardf.deal::before, .tcard.turnin .cardf::before { display: none; } }
+
+/* Play setup: My stats / Daily game / Rules, and your record (bids hit, best round) */
+.pl-more { gap: 8px; }
+.pl-more .btn { padding: 0 10px; white-space: nowrap; }
+.pl-more .pf-open svg { flex: none; margin-right: 6px; border-radius: 50%; }
+.rec-line { font-size: 12.5px; }
+.rec-line b { color: var(--text); }
+
+/* Review: every trick of a round, the winning card ringed in gold */
+.rv-top { display: flex; align-items: center; gap: 10px; }
+.rv-top h3 { flex: 1; text-align: center; }
+.rv-top .btn { width: 44px; padding: 0; font-size: 20px; }
+.rv-bids { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.review { display: flex; flex-direction: column; gap: 10px; max-height: 52dvh; min-height: 0; }
+.rv-trick { border-top: 1px solid var(--line); padding-top: 8px; }
+.rv-head { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; }
+.rv-cs { display: flex; gap: 4px; flex-wrap: wrap; }
+.rv-c { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 40px; }
+.rv-nm { font-size: 10.5px; font-weight: 700; white-space: nowrap; overflow: hidden; max-width: 40px; }
+.rv-as { font-size: 9.5px; color: var(--muted); }
+.cardf.rv { width: 40px; height: 56px; border-radius: 4px; }
+.cardf.rv svg { border-radius: 4px; }
+.rv-c.win .cardf { box-shadow: 0 0 0 2px var(--gold), 0 3px 8px rgba(0,0,0,.5); }
+@media (min-width: 700px) { .rv-c, .rv-nm { width: 48px; max-width: 48px; } .cardf.rv { width: 48px; height: 67px; } }

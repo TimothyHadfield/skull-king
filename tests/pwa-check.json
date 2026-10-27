@@ -1,0 +1,10 @@
+{
+  "repo": "skull-king",
+  "ready": "!!(window.App && document.querySelector('#v-play .pl, #v-play [data-act=\"pl-start\"]'))",
+  "play": [
+    "(async () => { const w = ms => new Promise(r => setTimeout(r, ms)); if (window.COACH) COACH.closeOffer(); App.settings.speed = 'fast'; App.setTab('play'); App.startGame(''); for (let i = 0; i < 100; i++) { if (document.querySelector('#v-play [data-act=\"pl-bid\"]')) break; await w(100); } window.__seq = App.play.state.seq; document.querySelector('#v-play [data-act=\"pl-bid\"][data-b=\"1\"]').click(); })()"
+  ],
+  "played": "(() => { const s = App.play.state; return !!s && s.phase === 'play' && s.seq > window.__seq; })()",
+  "safe": "App.setTab('settings')",
+  "debug": "JSON.stringify((() => { const s = App.play.state; return s ? { phase: s.phase, seq: s.seq, before: window.__seq, turn: s.turn, trick: s.trick.length } : null; })())"
+}
