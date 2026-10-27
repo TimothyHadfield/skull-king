@@ -1116,7 +1116,7 @@
   const NET_KEY = 'online.skull-king';
   let NET = null, netMod = null;
   async function netOpen() {
-    if (!netMod) netMod = await import(new URL('js/online.js?v=3', document.baseURI).href);
+    if (!netMod) netMod = await import(new URL('js/online.js?v=a3d0418b', document.baseURI).href);
     if (!NET) {
       NET = netMod.createOnline({ game: window.SKGame.game, gameId: 'skull-king', botDelayMs: 700 });
       NET.on('change', onNetSnap);
@@ -1171,7 +1171,7 @@
   // ?netlocal=1: the same online screens driven by online.js's createLocal room
   // (no network). Used for scripted checks of the online code path.
   async function netLocalTest() {
-    netMod = await import(new URL('js/online.js?v=3', document.baseURI).href);
+    netMod = await import(new URL('js/online.js?v=a3d0418b', document.baseURI).href);
     PLAY.net = { status: 'joining' };
     NET = netMod.createLocal({ game: window.SKGame.game, seats: ['human', 'computer', 'computer', 'computer'], names: ['Tim'],
       options: { schedule: S.schedule, opts: { kraken: S.kraken, whale: S.whale, loot: S.loot }, abilities: S.abilities, scoring: S.scoring, cannonball: S.cannonball }, botDelayMs: 300 });
