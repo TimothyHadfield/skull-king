@@ -1,7 +1,7 @@
 # Skull King: progress
 
 ## START HERE
-Read in this order: this file → `CLAUDE.md` → `docs/rules-check.md` (rules and sources) → `docs/ideas.md`. Last updated **2026-10-27** (visibility pass: bigger trick and tokens, assets ?v=9; earlier: first build + phase 2 + QA fixes + visual design pass + sounds/celebrations/animations + real-table Play screen + weird-scenario edge pass, assets ?v=8).
+Read in this order: this file → `CLAUDE.md` → `docs/rules-check.md` (rules and sources) → `docs/ideas.md`. Last updated **2026-10-27** (improve pass: opens on Play, Undo + trick review, My stats/Daily/rules/guided first game, install + offline, richer number-card art, capture spotlight; assets ?v=13. Before that, the visibility pass: bigger trick and tokens, ?v=9; earlier: first build + phase 2 + QA fixes + visual design pass + sounds/celebrations/animations + real-table Play screen + weird-scenario edge pass, assets ?v=8).
 
 ## Goal right now
 A Skull King site for Tim's phone: a real-table scorekeeper and bid advisor (used most), plus the full game with exact rules against computers or friends online.
@@ -20,7 +20,8 @@ A Skull King site for Tim's phone: a real-table scorekeeper and bid advisor (use
 | Sound & effects (2026-10-20): shared `js/fx.js` 1.0.1 (copied unchanged from `_fx/`) + game-local `js/sfx.js` (state-diff → sounds/animations, 6 custom sounds); "Sound & effects" group in Settings; scorekeeper ticks/count-up/finish confetti | Done; see the event→sound map below |
 | Real-table Play screen (2026-10-20): dark-wood table from the shared `_table` kit (`js/table.js` + `css/table.css`, byte copies). Opponents round the far side with a name plate, a fan of card backs and, in front of them, a bid token plus their won tricks as small face-down cards. Each trick card lies in front of whoever played it. The deck is on the table, your hand is fanned at the bottom, and a paper score pad on the table opens the round table on phone (the side panel shows it on laptop). Cards deal from the deck with a flip, opponents' cards turn up as they land, and the finished trick slides to the winner. fx.js re-copied at 1.0.3 | Done; research in the manager's scratchpad `table/skull-king/real.md`, before/after shots in `table/skull-king/` (10 states x 393, 1280, 320, 659-landscape: 40/40 with no overflow and no errors), 2 reviewer rounds |
 | Edge pass (2026-10-20): 59 weird scenarios tested, 15 failed on the old code, all fixed (see "Edge pass" below) | Done |
-| Tests: engine 39, ai 9, online 5, fx 9 (all pass); engine/ai/online each seen failing under a deliberate bug (50 mutations); fx test failed before sfx.js existed and caught 11/11 mutations | Done |
+| Improve pass (2026-10-27, vs BGA / competitor-analysis `card.md`): opens on Play (Score only while a scoresheet is in progress); Undo your last move vs computers (up to the round's results, never in the Daily); Review every trick of any round (results sheet + game over); shared kits copied unchanged: `_coach` (rules sheet, guided first game, seed 17), `_profile` 1.1.0 (My stats, achievements, Daily game; Hint/Undo games "with help" and unrated, leaving mid-game = a loss, tutorial and online not counted), `_pwa` 1.2.0 (home-screen install + offline); record line at game over (bids hit %, rounds, best round); Settings "Learn" group; richer number cards (suit-coloured card, big emblem, texture, paper corner tabs); a capture swells the winning card, a made 60+ round lights your chip | Done; live at 8a3cb7b + later commits; WebKit scripted check 27/27 (scratch `improve/skull-king/sk-check.mjs`), pwa-check 18/18 (2/18 on the old build) |
+| Tests: engine 39, ai 9, online 5, fx 10, profile 9 (all pass); engine/ai/online each seen failing under a deliberate bug (50 mutations); fx test failed before sfx.js existed and caught 11/11 mutations; the spotlight test and profile tests were each seen failing first | Done |
 
 ## Edge pass (2026-10-20): weird scenarios
 59 scenarios (rare rules, odd people, odd taps, odd devices, odd screens) in the manager's scratchpad `edge/skull-king/scenarios.md`, with scripts `rules.cjs`, `ui.mjs`, `da.mjs`, `extra.mjs`, `tap.mjs` and shots. 41 passed on the old code, 3 were only covered indirectly, 15 failed and are fixed (each seen failing first):
@@ -73,6 +74,7 @@ Every other button: the shared quiet `tap`. Computer turns use the same sounds a
 | Medium | Easy | 1000 | **46%** | +103 | 55% / 42% |
 | Medium | Hard | 200 | **9%** | −131 | 61% / 60% |
 | Easy | Medium | 1000 | **10%** | −112 | 41% / 55% |
+Re-measured 2026-10-27 on the improve-pass code: Medium vs 3 Easy 46.3% (400 games), Hard vs 3 Medium 75% (60 games). Ladder holds; no AI change. Profile ratings from these: Easy 1200, Medium 1360, Hard 1750 (`js/skprofile.js`).
 BID_SCALE 1.15 chosen by tuning (medium mirror avg score: 0.7 → −21, 0.85 → 10, 1.15 → 83, 1.3 → 92).
 
 ## Authorized next steps
@@ -109,6 +111,11 @@ BID_SCALE 1.15 chosen by tuning (medium mirror avg score: 0.7 → −21, 0.85 �
 - `.trick` is `pointer-events: none`: it lies over the whole felt and once blocked taps on the score pad. Keep it that way.
 - Trick cards are placed in px by `fitTrick` in app.js (after every render and on resize), not by CSS. It tries the biggest size that keeps every card under its seat, clear of the deck, pad and message. Changing the deck, pad or msg position changes the fit.
 - Measuring scripts for the visibility pass (states, shots, check, taps) are in the manager scratchpad `vis/skull-king/`.
+- Your moves vs computers go through `myMove(a)` in app.js (takes the Undo snapshot, then applies). A new move type must go through it too or Undo skips it. Undo marks the game `helped` (unrated).
+- `PLAY.tricks` is the per-trick list kept for Review and the profile summary (pushed in `logTrick`); Undo trims it. It's saved with the play state.
+- Profile data lives in localStorage `profile:skull-king` (shared kit). `js/profile.js`, `css/profile.css`, `js/coach.js`, `css/coach.css`, `js/pwa.js`, `sw.js`, `tools/pwa-check.mjs`, `tools/make-icons.mjs` are kit copies: never edit here, re-copy. Game parts are `js/skprofile.js` and `js/skcoach.js`.
+- Each release bumps every `?v=` in index.html AND `data-version` on the pwa.js tag (the service worker cache key).
+- `recordGame()` runs once per game (`PLAY.recorded`); leaving mid-game records a loss before the new game starts.
 - Sounds are driven by `PLAY.fxArmed/fxPrev` (set in `applyAction`, `startGame`, `onNetSnap`; consumed in `afterChange`). A new state path must arm it too or it will be silent.
 
 ## Decisions
@@ -132,6 +139,7 @@ BID_SCALE 1.15 chosen by tuning (medium mirror avg score: 0.7 → −21, 0.85 �
 - Study "every hand" reveal is local-only (online it would leak hands).
 - The 2025 expansion pack isn't implemented (rules unsettled).
 - Sound & effects is a Settings group after "Help while playing"; the "Fast" there is animation speed, separate from Computer speed.
+- Improve pass (2026-10-27), choices made without Tim: open on Play (tab order unchanged); a My stats / Daily game / Rules row under the computer setup; achievement names (First mate, Captain, Perfect voyage, Lie low, Siren song, Big haul, Full crew, Hat trick, Daily sailor); Daily = standard 10 rounds vs 3 Medium; record line in the game-over sheet; Undo allowed until the round's results; Settings "Learn" group replaces the inline rules; online games aren't recorded in My stats; number-card colours and textures; spotlight threshold 60 points.
 - The big celebration fires only when YOU take the Skull King with a mermaid; others' captures get the `capture` sound only.
 
 ## NOT verified
@@ -146,7 +154,8 @@ BID_SCALE 1.15 chosen by tuning (medium mirror avg score: 0.7 → −21, 0.85 �
 - Online netBusy 6 s release: no test could make the host refuse a move (reasoned fix).
 - Left as is (edge pass): online, the round's last trick isn't shown before the next deal (rounds advance at once by design); Bendt's 2 drawn cards aren't marked in the hand; an online player named "You" or a computer's name reads ambiguously; a scorekeeper tie-break round stays after an earlier round is edited out of the tie (finish it with zeros).
 - Real Skull King card size (poker size) is reasoned, not confirmed.
-- Visibility pass, still small (measured 2026-10-27): at 320 px with 6–8 players the trick cards are 37 px with a 10.6 px index; the round-10 trick at 393 is 69 px; overlapping trick cards hide each other's bottom index (the top-left one shows); names are cut ("Ed…") in tight seats; the laptop "What happened" panel is empty before the first trick.
+- Visibility pass, still small (measured 2026-10-27): at 320 px with 6–8 players the trick cards are 37 px with a 10.6 px index; the round-10 trick at 393 is 69 px; overlapping trick cards hide each other's bottom index (the top-left one shows); names are cut ("Ed…") in tight seats.
+- Improve pass: install to home screen and offline play checked by pwa-check in headless browsers only, not on a real iPhone; the guided first game walked in WebKit to the Scoring step, not to the end; the spotlight seen firing (count) but not watched smoothly; landscape 659x393 not re-checked after this pass; review names are cut to 6 letters ("Edwar").
 - The bid "✓" renders as "√" in headless WebKit on Windows (font fallback); expected fine on iPhone.
 - Reload-with-sheet-open fix checked only via `history.state` after reload, not by pressing Back on a phone.
 

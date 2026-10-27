@@ -1313,9 +1313,11 @@
     if (PLAY.net || PLAY.daily || !PLAY.state) return;
     PLAY.undo = { state: PLAY.state, log: (PLAY.log || []).slice(), tricks: PLAY.tricks.length, study: PLAY.study ? JSON.parse(JSON.stringify(PLAY.study)) : null };
   }
-  function myMove(a) {
+  // before: what the move changes besides the table (the Study tally), so Undo takes that back too.
+  function myMove(a, before) {
     const prev = PLAY.undo;
     snapUndo();
+    if (before) before();
     if (!applyAction(a)) PLAY.undo = prev;
   }
   function undo() {
@@ -1327,6 +1329,7 @@
     PLAY.state = u.state; PLAY.log = u.log; PLAY.tricks.length = Math.min(PLAY.tricks.length, u.tricks);
     if (u.study) PLAY.study = u.study;
     PLAY.undo = null; PLAY.helped = true; PLAY.hint = null; PLAY.sel = null; PLAY.discard = [];
+    PLAY.evalCache = null; PLAY.bidCache = null; // Study's sums are keyed by seq, which repeats after Undo
     PLAY.trickKey = null; PLAY.lastSeq = u.state.seq; // put the trick back without flying it anywhere
     afterChange();
   }
@@ -1344,7 +1347,9 @@
     }
     if (window.Profile && SKP) {
       try {
-        window.Profile.recordResult(SKP.result({ st, me: PLAY.me, levels: PLAY.seats.filter(s => s.kind === 'cpu').map(s => s.level), helped: PLAY.helped, daily: !!PLAY.daily, tricks: PLAY.tricks }));
+        const r = SKP.result({ st, me: PLAY.me, levels: PLAY.seats.filter(s => s.kind === 'cpu').map(s => s.level), helped: PLAY.helped, daily: !!PLAY.daily, tricks: PLAY.tricks });
+        if (PLAY.daily) r.date = PLAY.daily.day; // a Daily finished after midnight still belongs to the day it was dealt
+        window.Profile.recordResult(r);
       } catch (e) { /* the stats never stop the game */ }
     }
     save();
@@ -1382,7 +1387,7 @@
   function startTutorial() {
     if (!tour) return;
     if (PLAY.net) { toast('Leave the online room first'); return; }
-    if (PLAY.state && PLAY.state.phase !== 'over' && !PLAY.tutorial) recordGame(); // leaving a game counts as a loss
+    if (PLAY.state && PLAY.state.phase !== 'over' && !PLAY.tutorial) { toast('Finish or leave this game first'); return; }
     tour.reset();
     if (tab !== 'play') setTab('play');
     startGame('tutorial');
@@ -1556,7 +1561,7 @@
       case 'pl-add': PLAY.setup.push({ kind: 'cpu', level: 'medium' }); renderPlay(); return true;
       case 'pl-del': PLAY.setup.splice(+d.i, 1); renderPlay(); return true;
       case 'pl-start': startGame(''); return true;
-      case 'pl-bid': studyAfterBid(+d.b); myMove({ type: 'bid', seat: me, bid: +d.b }); afterChange(); return true;
+      case 'pl-bid': myMove({ type: 'bid', seat: me, bid: +d.b }, () => studyAfterBid(+d.b)); afterChange(); return true;
       case 'pl-cannon': myMove({ type: 'cannon', seat: me, on: d.on === '1' }); afterChange(); return true;
       case 'pl-undo': undo(); return true;
       case 'pl-review': reviewSheet(d.r); return true;
@@ -1570,10 +1575,10 @@
         if (SK.legalPlays(st, me).indexOf(id) < 0) { if (SFX) SFX.illegal(el); toast('Follow the suit that was led'); return true; }
         if (CARDS[id].k === 'tig') { PLAY.sel = id; renderPlay(); return true; }
         PLAY.fxFrom = el.getBoundingClientRect(); // the card flies from here to the table
-        studyAfterPlay({ id }); myMove({ type: 'play', seat: me, card: id }); afterChange(); return true;
+        myMove({ type: 'play', seat: me, card: id }, () => studyAfterPlay({ id })); afterChange(); return true;
       }
-      case 'pl-tig': { const id = PLAY.sel; studyAfterPlay({ id, as: d.as });
-        const src = document.querySelector(`#v-play .hand [data-id="${id}"]`); if (src) PLAY.fxFrom = src.getBoundingClientRect(); myMove({ type: 'play', seat: me, card: id, as: d.as }); afterChange(); return true; }
+      case 'pl-tig': { const id = PLAY.sel;
+        const src = document.querySelector(`#v-play .hand [data-id="${id}"]`); if (src) PLAY.fxFrom = src.getBoundingClientRect(); myMove({ type: 'play', seat: me, card: id, as: d.as }, () => studyAfterPlay({ id, as: d.as })); afterChange(); return true; }
       case 'pl-unsel': PLAY.sel = null; renderPlay(); return true;
       case 'pl-hint': if (!PLAY.net) { PLAY.helped = true; save(); } hint(); return true;
       case 'pl-ab': {

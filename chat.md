@@ -1,5 +1,12 @@
 # Skull King: chat log
 
+## 2026-10-27: improve pass vs BGA (builder agent)
+- **Asked** (manager's per-game brief + `competitor-analysis/card.md`): open on Play, not another tab; Hard > Medium > Easy measured; Undo vs computer and an end-of-game review; shared kits `_coach`, `_profile` 1.1.0, `_pwa` 1.2.0, fx.js re-copied; richer original suit-card art; bigger key-moment animations; no empty bands. Don't touch `js/online.js` or online flows.
+- **Built** (3 commits): opens on Play; Undo + Review; My stats, achievements, Daily, rules sheet, guided first game; install + offline; record line (bids hit %, best round) at game over; suit-coloured number cards with a big emblem; capture spotlight and big-round chip flash. Only online-adjacent edit: `onNetSnap` resets the new PLAY fields for a new online game.
+- **Verified**: unit tests engine 39, ai 9, online 5, fx 10, profile 9; new tests seen failing first; WebKit scripted check 27/27, 0 page errors (scratch `improve/skull-king/sk-check.mjs`); pwa-check 18/18 (2/18 on the old build); strength re-measured (Medium vs Easy 46.3%/400, Hard vs Medium 75%/60, fair 25%); screenshots at 393 and 1440 in the manager scratchpad `improve/skull-king/`.
+- **Reviewer** (one read-only agent) found 4 med/low bugs, all fixed and each seen failing first in WebKit (scratch `rv-fix-check.mjs`): Undo kept the Study penalty of the undone move; Study's cached sums reused after Undo; "Replay tutorial" in Settings threw away a game in progress (now: "Finish or leave this game first"); a Daily finished after midnight was filed under the next day.
+- **Open**: Tim's calls listed under Decisions; NOT verified list updated.
+
 ## 2026-10-27: visibility pass (builder agent)
 - **Asked** (Tim, via the manager): "the cards or board layout is too small to easily see what's going on ... Consider parts of the board that are dense". The dense spots were the round-10 hand, an 8-player trick, and the 8-player bids/won/score tables.
 - **Built:**
