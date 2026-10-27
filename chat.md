@@ -1,5 +1,24 @@
 # Skull King: chat log
 
+## 2026-10-27: visibility pass (builder agent)
+- **Asked** (Tim, via the manager): "the cards or board layout is too small to easily see what's going on ... Consider parts of the board that are dense". The dense spots were the round-10 hand, an 8-player trick, and the 8-player bids/won/score tables.
+- **Built:**
+  - `fitTrick` in app.js places each trick card under its player at the biggest size that clears the deck, pad and message.
+  - The deck and pad sit in the top corners on an upright phone.
+  - Bid tokens are 22–24 px.
+  - Won piles show 4 backs plus a count.
+  - The score pad can be tapped again (the trick layer had been covering it).
+  - Sideways phone: the seats now span only the felt, and the plate sits under the buttons.
+  - 8-player scoresheet and side table fit without scrolling sideways.
+  - Assets are ?v=9.
+- **Verified:**
+  - 13 states × 5 sizes in WebKit. check.mjs found 52 failures on the old build and 5 after (space limits, listed in NOT verified).
+  - Trick cards at 393 with 8 players: 45–55 px before, 72–75 px after. On laptop: 72–87 px before, 99–146 px after.
+  - Real taps in WebKit and Chrome at 4 sizes: the score pad opens and hand cards play.
+  - Tests pass: 39/9/5/9.
+  - One reviewer round. I fixed the 8-player landscape trick layout, the pile count and the 320 tables. The overlap of bottom indexes, cut names and the empty laptop log were left as they are.
+  - Scripts and shots are in the manager scratchpad `vis/skull-king/`.
+
 ## 2026-10-20: weird-scenario edge pass (builder agent)
 - Asked (Tim, via manager): "making each game perfect especially in scenarios that the game doesn't expect or are a little weird"; known issue: 27–35 px tap strips on a 10-card hand.
 - Built: two-row hand when one row is under 42 px per card (re-lays out on rotate); hint non-blocking with "Thinking…"; saved-data validation; engine refuses blank bids and cuts names by whole characters; Harry buttons disabled when they'd do nothing; 320 px scorekeeper fits; 2-player scorekeeper allows ghost tricks; Cannonball picks hidden until all in + waiting message; no ghost bonus text; Settings re-renders after Leave; online results wait behind an open sheet; online taps unlock after 6 s. Assets ?v=8.

@@ -1,7 +1,7 @@
 # Skull King: progress
 
 ## START HERE
-Read in this order: this file → `CLAUDE.md` → `docs/rules-check.md` (rules and sources) → `docs/ideas.md`. Last updated **2026-10-20** (first build + phase 2 + QA fixes + visual design pass + sounds/celebrations/animations + real-table Play screen + weird-scenario edge pass, assets ?v=8).
+Read in this order: this file → `CLAUDE.md` → `docs/rules-check.md` (rules and sources) → `docs/ideas.md`. Last updated **2026-10-27** (visibility pass: bigger trick and tokens, assets ?v=9; earlier: first build + phase 2 + QA fixes + visual design pass + sounds/celebrations/animations + real-table Play screen + weird-scenario edge pass, assets ?v=8).
 
 ## Goal right now
 A Skull King site for Tim's phone: a real-table scorekeeper and bid advisor (used most), plus the full game with exact rules against computers or friends online.
@@ -84,6 +84,7 @@ BID_SCALE 1.15 chosen by tuning (medium mirror avg score: 0.7 → −21, 0.85 �
 - "add opptional sounds you can add to the games that reflect what's happening in the game accurately as well as win celebrations, and other fun annimations to go along with everything. Just make sure everything is customizable in the settings so the user can play as preffered." (2026-10-20)
 - "could you also make sure that each of the games also have a look to them so that the game (either board or card layout) looks almost identical to how the board or card layout looks like in real life, so it's easy to understand if you've already played it before, and also so it feels more like you're actually playing in real life rather than you're playing it online. Even things like how youre cards or other things are laid out infront of you, make it look like they are actual cards laid out similar to how it looks like in real life. Make the decks look like actual decks. Make the board have the same design as it does in real life with the same layouts. It should look kind of like you're looking through a camera that is connected to a user's glasses that is playing in real life (not actually, but the layout and style of everything should be similar)." (2026-10-20)
 - "I've noticed the games often have good user interfaces but could be improved especially when a scenario happens that the game might've not really thought about or whatnot. Could you focus on making each game perfect especially in scenarios that the game doesn't expect or are a little weird." (2026-10-20)
+- "for a lot of the games the cards or board layout is too small to easily see what's going on. Some games just need small design imporvements like filling the screen with the board view and fitting the cards and other things in the empty space, some have severe errors like TTR. Fix this so the view of what's happening and where everything is is very clear. Consider parts of the board that are dense in what's happening and if the user can reasonably see it." (visibility pass, done 2026-10-27)
 - From the common brief: real-table companion first; odds at the point of decision; computers with measured strength; study mode; dark phone-first look on the Hub tokens; $0; no copyrighted art or rule text.
 
 ## Traps
@@ -105,6 +106,9 @@ BID_SCALE 1.15 chosen by tuning (medium mirror avg score: 0.7 → −21, 0.85 �
 - The global `.empty` class (padding 18px) once squashed the empty bid token into an oval; the token uses `nobid` now. Don't reuse generic class names on the table.
 - sfx.js finds seats by `.seatbox[data-seat]` and bid numbers by `.bidtok`: keep those selectors if the table markup changes.
 - Other agents' Python servers sit on "random" ports and serve other games: use a node server on port 0 (scratch `table/skull-king/serve.cjs`).
+- `.trick` is `pointer-events: none`: it lies over the whole felt and once blocked taps on the score pad. Keep it that way.
+- Trick cards are placed in px by `fitTrick` in app.js (after every render and on resize), not by CSS. It tries the biggest size that keeps every card under its seat, clear of the deck, pad and message. Changing the deck, pad or msg position changes the fit.
+- Measuring scripts for the visibility pass (states, shots, check, taps) are in the manager scratchpad `vis/skull-king/`.
 - Sounds are driven by `PLAY.fxArmed/fxPrev` (set in `applyAction`, `startGame`, `onNetSnap`; consumed in `afterChange`). A new state path must arm it too or it will be silent.
 
 ## Decisions
@@ -116,6 +120,15 @@ BID_SCALE 1.15 chosen by tuning (medium mirror avg score: 0.7 → −21, 0.85 �
 - Edge pass choices made without Tim (2026-10-20): 10-card hand in two rows on phone (front row's odds badge moves to the card's bottom); scorekeeper rows at ≤360 px wrap to two lines (name above) and the Bids/Tricks switch narrows; Hint button says "Thinking…" while it works.
 - Play layout (2026-10-20, replaces the row layout): one fanned hand (76 px cards on phone, 100 px on laptop); trick cards are anchored in front of each seat (`trickAnchor` in app.js). Phone on its side moves the actions to the right edge. Laptop seats curve down toward the sides.
 - Table look choices made without Tim: dark wood; bids as wooden tokens with a black dot for Cannonball; won tricks as mini face-down cards; card names under trick cards dropped except Tigress's "as Pirate/Escape"; deck at the bottom-left; score pad as a tap target at the bottom-right on phone.
+- Visibility pass (2026-10-27), choices made without Tim:
+  - On an upright phone the deck and score pad sit in the top corners.
+  - Trick cards grow up to 104 px on phone and 132 px on laptop.
+  - Bid tokens are 22–24 px.
+  - Won piles show at most 4 backs plus a white count.
+  - Sideways phone: the seats span only the felt, and the buttons take the full right column.
+  - The 8-player scoresheet stacks bid/won in each cell and cuts names to 5 letters.
+  - The "many" side table starts at 5+ opponents.
+  - Assets are ?v=9.
 - Study "every hand" reveal is local-only (online it would leak hands).
 - The 2025 expansion pack isn't implemented (rules unsettled).
 - Sound & effects is a Settings group after "Help while playing"; the "Fast" there is animation speed, separate from Computer speed.
@@ -133,6 +146,7 @@ BID_SCALE 1.15 chosen by tuning (medium mirror avg score: 0.7 → −21, 0.85 �
 - Online netBusy 6 s release: no test could make the host refuse a move (reasoned fix).
 - Left as is (edge pass): online, the round's last trick isn't shown before the next deal (rounds advance at once by design); Bendt's 2 drawn cards aren't marked in the hand; an online player named "You" or a computer's name reads ambiguously; a scorekeeper tie-break round stays after an earlier round is edited out of the tie (finish it with zeros).
 - Real Skull King card size (poker size) is reasoned, not confirmed.
+- Visibility pass, still small (measured 2026-10-27): at 320 px with 6–8 players the trick cards are 37 px with a 10.6 px index; the round-10 trick at 393 is 69 px; overlapping trick cards hide each other's bottom index (the top-left one shows); names are cut ("Ed…") in tight seats; the laptop "What happened" panel is empty before the first trick.
 - The bid "✓" renders as "√" in headless WebKit on Windows (font fallback); expected fine on iPhone.
 - Reload-with-sheet-open fix checked only via `history.state` after reload, not by pressing Back on a phone.
 
