@@ -115,22 +115,46 @@
   }
 
   // ------------------------------------------------------------ number cards
-  function numFace(c) {
-    var col = SUIT_COLORS[c.s];
-    if (c.s === 0) { // trump: dark card, light ink
-      var light = '#ece6d6';
-      return base('#17191f', '#0b0c10', '#8a826c') +
-        '<path d="M5.5 45h89M5.5 95h89" stroke="#8a826c" stroke-width=".8" opacity=".5"/>' +
-        '<circle cx="50" cy="70" r="31" fill="#262a35"/>' +
-        '<g transform="translate(19 39) scale(1.3)">' + flag('#0b0c10', light, light) + '</g>' +
-        corners(c.r, light, '#17191f');
+  // Suit-coloured card, a light texture of the suit's world, and the emblem large in the middle.
+  // Corner tabs are paper with the suit's dark ink so the number stays easy to read at 40 px.
+  // deep = dark suit ink, fill = the emblem's own colour, glow = the medallion behind it.
+  var NUM_ART = [
+    { bg: '#1a1d25', deep: '#0b0c10', frame: '#b9a66e', fill: '#0b0c10', glow: '#2c313e', ink: '#ece6d6', tab: '#ece6d6', tabInk: '#14161c' },
+    { bg: '#e2ad2b', deep: '#8a5a00', frame: '#fbe7a6', fill: '#a9652c', glow: '#f3cf6a', ink: INK, tab: PAPER, tabInk: '#8a5a00' },
+    { bg: '#8a5bc8', deep: '#5b3592', frame: '#d9c6f3', fill: '#f1e4c4', glow: '#a47ddb', ink: INK, tab: PAPER, tabInk: '#5b3592' },
+    { bg: '#3a9d58', deep: '#1f6a3a', frame: '#bfe6c9', fill: '#d8452f', glow: '#5cb876', ink: INK, tab: PAPER, tabInk: '#1f6a3a' },
+  ];
+  function texture(s, k) {
+    var g = '<g fill="none" stroke="' + k + '" stroke-width="1.3" opacity=".22">';
+    if (s === 1) { // scattered doubloons
+      [[22, 50], [80, 46], [16, 98], [84, 96], [30, 118], [72, 120], [50, 24], [70, 26]].forEach(function (p) {
+        g += '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="4.2"/><circle cx="' + p[0] + '" cy="' + p[1] + '" r="2" stroke-width=".9"/>';
+      });
+    } else if (s === 2) { // a chart's grid and a compass rose
+      for (var x = 20; x <= 80; x += 15) g += '<path d="M' + x + ' 8v124" stroke-dasharray="2 3"/>';
+      for (var y = 25; y <= 125; y += 20) g += '<path d="M8 ' + y + 'h84" stroke-dasharray="2 3"/>';
+      g += '<path d="M78 112l3-9 3 9-3 9zM70 112l11-3 11 3-11 3z" fill="' + k + '" stroke="none"/>';
+    } else { // the sea (green: jungle leaves above it; black: storm waves)
+      for (var w = 0; w < 4; w++) {
+        var yy = 104 + w * 8;
+        g += '<path d="M8 ' + yy + 'q5 -4 10 0t10 0t10 0t10 0t10 0t10 0t10 0t10 0t10 0"/>';
+      }
+      if (s === 3) g += '<path d="M10 22c10-8 22-6 28 2-10 2-20 2-28-2zM90 30c-10-8-22-6-28 2 10 2 20 2 28-2zM14 44c8-6 16-4 20 2-8 1-14 1-20-2z" fill="' + k + '" stroke="none"/>';
+      else g += '<path d="M14 24l-4 8h5l-3 8M86 28l-4 8h5l-3 8" stroke-width="1.6"/>';
     }
-    var txt = c.s === 1 ? '#2a1d00' : '#fff';
-    return base(PAPER, col, col) +
-      '<rect x="5.5" y="5.5" width="89" height="129" rx="5" fill="none" stroke="' + col + '" stroke-width="4" opacity=".35"/>' +
-      '<circle cx="50" cy="70" r="31" fill="' + col + '" opacity=".2"/>' +
-      '<g transform="translate(19 39) scale(1.3)">' + emblem(c.s, col, INK, '#fff') + '</g>' +
-      corners(c.r, col, txt);
+    return g + '</g>';
+  }
+  function numFace(c) {
+    var a = NUM_ART[c.s];
+    var light = c.s === 0 ? a.ink : '#fff';
+    return '<rect x="1" y="1" width="98" height="138" rx="8" fill="' + a.bg + '" stroke="' + a.deep + '" stroke-width="2"/>' +
+      texture(c.s, c.s === 0 ? a.frame : a.deep) +
+      '<rect x="5.5" y="5.5" width="89" height="129" rx="5" fill="none" stroke="' + a.frame + '" stroke-width="1.4" opacity=".8"/>' +
+      '<circle cx="50" cy="70" r="34" fill="' + a.glow + '"/>' +
+      '<circle cx="50" cy="70" r="34" fill="none" stroke="' + a.deep + '" stroke-width="2" opacity=".55"/>' +
+      '<circle cx="50" cy="70" r="30.5" fill="none" stroke="' + a.frame + '" stroke-width="1" stroke-dasharray="1.5 2.5"/>' +
+      '<g transform="translate(13 33) scale(1.54)">' + (c.s === 0 ? flag(a.fill, a.ink, light) : emblem(c.s, a.fill, a.ink, light)) + '</g>' +
+      corners(c.r, a.tab, a.tabInk);
   }
 
   // ------------------------------------------------------------ specials
