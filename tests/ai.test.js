@@ -80,5 +80,34 @@ test('hard evaluates every option and ranks them', () => {
   for (let i = 1; i < opts.length; i++) assert.ok(opts[i - 1].ev >= opts[i].ev);
 });
 
+// Cannonball (Rascal add-on): exact pays 15/card instead of 10, but off-by-one pays 0 instead of half.
+// Every level used to pick Grapeshot except Hard, so Medium never took the obvious Cannonball.
+function cannonState(seed, myCard, bid) {
+  let st = SK.newGame({ players: [0, 1, 2, 3].map(i => ({ name: 'P' + i, kind: 'cpu', level: 'medium' })), seed, scoring: 'rascal', cannonball: true });
+  if (myCard != null) { // give seat 0 this card (swap it out of whoever had it)
+    const owner = st.hands.findIndex(h => h.indexOf(myCard) >= 0);
+    if (owner > 0) { st.hands[owner] = st.hands[owner].map(x => (x === myCard ? st.hands[0][0] : x)); }
+    else if (owner < 0) { const u = st.undealt.indexOf(myCard); st.undealt[u] = st.hands[0][0]; }
+    st.hands[0] = [myCard];
+  }
+  for (const p of SK.whoActs(st)) st = SK.apply(st, { type: 'bid', seat: p, bid: p === 0 ? bid : 1 });
+  assert.strictEqual(st.phase, 'cannon');
+  return st;
+}
+test('medium fires the Cannonball with a near-certain Skull King bid of 1', () => {
+  const st = cannonState(5, 67, 1);
+  assert.strictEqual(AI.decideCannon(SK.view(st, 0), 0, 'medium', mulberry(3)).on, true);
+});
+test('medium keeps Grapeshot with a hopeless bid (Skull King, bid 0)', () => {
+  const st = cannonState(5, 67, 0);
+  assert.strictEqual(AI.decideCannon(SK.view(st, 0), 0, 'medium', mulberry(3)).on, false);
+});
+test('easy sometimes fires, sometimes not (not predictable)', () => {
+  const st = cannonState(9, null, 1);
+  const r = mulberry(4); let on = 0;
+  for (let i = 0; i < 200; i++) if (AI.decideCannon(SK.view(st, 0), 0, 'easy', r).on) on++;
+  assert.ok(on > 10 && on < 120, 'easy cannon ' + on + '/200');
+});
+
 console.log(`ai: ${passed} passed, ${failed} failed`);
 if (failed) process.exit(1);

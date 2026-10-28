@@ -11,7 +11,7 @@ Read `progress.md` first. Tim's global rules (`~/.claude/CLAUDE.md`) and `Code P
 
 ## Tests (run all before every push)
 ```
-node tests/engine.test.js && node tests/ai.test.js && node tests/online.test.mjs && node tests/fx.test.js && node tests/profile.test.js
+node tests/engine.test.js && node tests/ai.test.js && node tests/online.test.mjs && node tests/fx.test.js && node tests/profile.test.js && node tests/learn.test.js
 ```
 Home-screen install + offline (WebKit, about 2 min): `node tools/pwa-check.mjs` (18 checks, config `tests/pwa-check.json`).
 Strength: `node tools/strength.js <games> <levelA> <levelB> [players] [seed]` (hard is slow: about 7 s a game).

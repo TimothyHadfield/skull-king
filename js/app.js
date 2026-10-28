@@ -44,19 +44,25 @@
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
       try { localStorage.setItem(KEY, JSON.stringify({ settings: S, score: SC, adv: { players: ADV.players, cards: ADV.cards, before: ADV.before, hand: ADV.hand, mode: ADV.mode }, play: PLAY.state && !PLAY.net ? { state: PLAY.state, seats: PLAY.seats, study: PLAY.study, log: (PLAY.log || []).slice(-30), roundHands: PLAY.roundHands, shown: PLAY.shownRoundSheet,
-        tricks: PLAY.tricks, undo: PLAY.undo, helped: PLAY.helped, daily: PLAY.daily, tutorial: PLAY.tutorial, recorded: PLAY.recorded } : null, record: RECORD, tab })); } catch (e) { /* storage full or blocked */ }
+        tricks: PLAY.tricks, undo: PLAY.undo, helped: PLAY.helped, daily: PLAY.daily, tutorial: PLAY.tutorial, recorded: PLAY.recorded } : null, record: RECORD, tab, setup: PLAY.setup })); } catch (e) { /* storage full or blocked */ }
     }, 120);
   }
 
   const saved = load();
   const S = Object.assign({
     scoring: 'sk', cannonball: false, kraken: false, whale: false, loot: false, abilities: false,
-    schedule: 'standard', ghost: true, odds: true, study: false, speed: 'normal',
+    schedule: 'standard', ghost: true, odds: true, study: false, speed: 'normal', confirm: false,
   }, saved.settings || {});
   // Saved data from an older or broken version must not stop the page from opening.
   if (!SK.SCHEDULES[S.schedule]) S.schedule = 'standard';
   if (S.scoring !== 'rascal') S.scoring = 'sk';
-  if (S.speed !== 'fast') S.speed = 'normal';
+  if (S.speed !== 'fast' && S.speed !== 'slow') S.speed = 'normal';
+  S.confirm = S.confirm === true;
+  // The last "Play the computer" table (seats and levels), so it comes back next time.
+  function setupOk(x) {
+    return Array.isArray(x) && x.length >= 2 && x.length <= 8 && x[0] && x[0].kind === 'you' &&
+      x.slice(1).every(s => s && s.kind === 'cpu' && ['easy', 'medium', 'hard'].indexOf(s.level) >= 0);
+  }
 
   // ---------------------------------------------------------- card faces
   function face(id, size, extra) {
@@ -85,6 +91,7 @@
     loot: 'Plays like an Escape. You and the trick winner each get +20 if you both hit your bids. Not used with 2 players.',
     ghost: "Official 2-player rule: a third face-down hand plays second each trick by flipping its top card. It doesn't bid or score.",
     schedule: 'Official shorter and longer games. The number is how many cards are dealt each round.',
+    confirm: 'The first tap lifts the card; tap it again (or Play) to play it. Stops a slip of the thumb.',
     odds: 'Shows the chance each card in your hand wins the trick, counting which cards are still unseen.',
     study: 'After each bid and card, shows the best choice (from thousands of simulated deals) and the points you gave up. Shows every hand when the round ends.',
     advisor: 'Deals the unseen cards thousands of ways, plays each round out with medium-strength computer players, and counts how often you take exactly each number of tricks. The best bid has the highest average points.',
@@ -608,6 +615,7 @@
     PLAY.helped = !!sp.helped; PLAY.tutorial = !!sp.tutorial; PLAY.recorded = !!sp.recorded;
     PLAY.daily = sp.daily && typeof sp.daily.day === 'string' ? sp.daily : null;
   }
+  if (setupOk(saved.setup)) PLAY.setup = saved.setup.map(s => (s.kind === 'you' ? { kind: 'you' } : { kind: 'cpu', level: s.level }));
   if (!PLAY.setup) PLAY.setup = [{ kind: 'you' }, { kind: 'cpu', level: 'medium' }, { kind: 'cpu', level: 'medium' }, { kind: 'cpu', level: 'hard' }];
   if (PLAY.state && !playStateOk(PLAY.state, PLAY.seats)) { PLAY.state = null; PLAY.undo = null; }
   // Your record across games (this device): rounds played, bids hit, best round.
@@ -736,6 +744,7 @@
     let odds = null;
     if (myTurn && S.odds && !(PLAY.hint && PLAY.hint.ev)) odds = AI.cardOdds(view, me);
     const discardMode = st.phase === 'ability' && st.pending && st.pending.seat === me && st.pending.ability === 'bendt';
+    const drawnNow = discardMode && st.pending.drawn ? st.pending.drawn : [];
     const dealing = st.round !== PLAY.dealtRound;
     const handCards = hand.map(id => {
       const can = myTurn ? legal.indexOf(id) >= 0 : discardMode;
@@ -746,6 +755,7 @@
       let badge = '';
       if (PLAY.hint && PLAY.hint.ev && PLAY.hint.ev[id] != null) badge = `<span class="badge" style="color:${heat(PLAY.hint.t[id])}">${sgn(PLAY.hint.ev[id])}</span>`;
       else if (odds && odds[id] != null) badge = `<span class="badge" style="color:${heat(odds[id])}">${Math.round(odds[id] * 100)}%</span>`;
+      else if (discardMode && drawnNow.indexOf(id) >= 0) badge = '<span class="badge drawn">New</span>'; // Bendt's 2 drawn cards
       return face(id, '', extra).replace('</div>', badge + '</div>').replace('class="cardf', `data-act="${discardMode ? 'pl-discard' : 'pl-card'}" class="cardf`);
     });
     PLAY.dealtRound = st.round;
@@ -764,7 +774,7 @@
         <div class="actions-wrap">${studyLine}<div class="actions">${actions}</div></div>
         <div class="mine seatbox ${meTurn ? 'is-turn' : ''}" data-seat="${me}">
           <div class="lay">${plateHTML(st, me, me)}${bidTokenHTML(st, view, me, me)}${tricksHTML(st.won[me])}</div>
-          <div class="hand ${odds || (PLAY.hint && PLAY.hint.ev) ? 'badges' : ''}" data-n="${hand.length}"></div>
+          <div class="hand ${odds || (PLAY.hint && PLAY.hint.ev) || drawnNow.length ? 'badges' : ''}" data-n="${hand.length}"></div>
         </div>
       </div>
       <div class="pl-side">${playSideHTML(st)}</div>
@@ -999,6 +1009,9 @@
       if (PLAY.sel != null && CARDS[PLAY.sel].k === 'tig') {
         return `<button class="btn" data-act="pl-tig" data-as="esc">As Escape</button><button class="btn primary" data-act="pl-tig" data-as="pir">As Pirate</button><button class="btn ghost sm" data-act="pl-unsel">Cancel</button>`;
       }
+      if (PLAY.sel != null && S.confirm) {
+        return `<button class="btn primary" data-act="pl-play-sel">Play ${esc(shortName(PLAY.sel))}</button><button class="btn ghost sm" data-act="pl-unsel">Cancel</button>`;
+      }
       return `<button class="btn sm ghost" data-act="pl-hint">${PLAY.hint ? 'Best: ' + esc(shortName(PLAY.hint.best)) + (PLAY.hint.bestAs ? (PLAY.hint.bestAs === 'esc' ? ' (escape)' : ' (pirate)') : '') : 'Hint'}</button>`;
     }
     if (st.phase === 'ability' && st.pending.seat === me) {
@@ -1097,7 +1110,7 @@
     const rules = [SK.SCHEDULES[S.schedule].name, S.scoring === 'rascal' ? 'Rascal' + (S.cannonball ? ' + Cannonball' : '') : 'Standard scoring']
       .concat(S.kraken ? ['Kraken'] : [], S.whale ? ['White Whale'] : [], S.loot ? ['Loot'] : [], S.abilities ? ['Pirate powers'] : []);
     return `<div style="display:flex;flex-direction:column;gap:12px;min-height:0;flex:1;max-width:560px;width:100%;margin:0 auto">
-      <div><div style="font-size:20px;font-weight:800">Play the computer</div><div class="muted" style="font-size:13px">${esc(rules.join(' · '))}</div></div>
+      <div class="row" style="align-items:flex-start;gap:8px"><div class="grow" style="min-width:0"><div style="font-size:20px;font-weight:800">Play the computer</div><div class="muted" style="font-size:13px">${esc(rules.join(' · '))}</div></div><button class="btn sm ghost" data-act="pl-setrules" style="flex:none">Change rules</button></div>
       <div class="seat-list scroll" style="flex:0 1 auto">${seats}</div>
       <div class="row"><button class="btn grow" data-act="pl-add" ${PLAY.setup.length >= 8 ? 'disabled' : ''}>Add computer</button><button class="btn primary grow" data-act="pl-start">Deal</button></div>
       <div class="row muted" style="font-size:12.5px;gap:6px">Easy plays by feel · Medium counts cards · Hard simulates <span style="margin-left:auto;white-space:nowrap">How strong?</span> ${q('strength')}</div>
@@ -1403,9 +1416,9 @@
 
   function delay() {
     const st = PLAY.state;
-    const fast = S.speed === 'fast';
-    if (st.phase === 'play' && st.trick.length === 0 && st.lastTrick) return fast ? 700 : 1400; // let the finished trick be seen
-    return fast ? 260 : 650;
+    const sp = S.speed === 'fast' ? 0 : S.speed === 'slow' ? 2 : 1;
+    if (st.phase === 'play' && st.trick.length === 0 && st.lastTrick) return [700, 1400, 2400][sp]; // let the finished trick be seen
+    return [260, 650, 1200][sp];
   }
 
   function afterChange() {
@@ -1557,9 +1570,10 @@
   function playAct(act, d, el) {
     const st = PLAY.state, me = PLAY.me;
     switch (act) {
-      case 'pl-level': PLAY.setup[+d.i].level = d.l; renderPlay(); return true;
-      case 'pl-add': PLAY.setup.push({ kind: 'cpu', level: 'medium' }); renderPlay(); return true;
-      case 'pl-del': PLAY.setup.splice(+d.i, 1); renderPlay(); return true;
+      case 'pl-level': PLAY.setup[+d.i].level = d.l; renderPlay(); save(); return true;
+      case 'pl-add': PLAY.setup.push({ kind: 'cpu', level: 'medium' }); renderPlay(); save(); return true;
+      case 'pl-del': PLAY.setup.splice(+d.i, 1); renderPlay(); save(); return true;
+      case 'pl-setrules': setTab('settings'); return true;
       case 'pl-start': startGame(''); return true;
       case 'pl-bid': myMove({ type: 'bid', seat: me, bid: +d.b }, () => studyAfterBid(+d.b)); afterChange(); return true;
       case 'pl-cannon': myMove({ type: 'cannon', seat: me, on: d.on === '1' }); afterChange(); return true;
@@ -1574,12 +1588,22 @@
         const id = +el.dataset.id;
         if (SK.legalPlays(st, me).indexOf(id) < 0) { if (SFX) SFX.illegal(el); toast('Follow the suit that was led'); return true; }
         if (CARDS[id].k === 'tig') { PLAY.sel = id; renderPlay(); return true; }
+        // "Tap twice to play": the first tap lifts the card, a second tap (or Play) plays it
+        if (S.confirm && PLAY.sel !== id) { PLAY.sel = id; renderPlay(); return true; }
         PLAY.fxFrom = el.getBoundingClientRect(); // the card flies from here to the table
+        PLAY.sel = null;
         myMove({ type: 'play', seat: me, card: id }, () => studyAfterPlay({ id })); afterChange(); return true;
       }
       case 'pl-tig': { const id = PLAY.sel;
         const src = document.querySelector(`#v-play .hand [data-id="${id}"]`); if (src) PLAY.fxFrom = src.getBoundingClientRect(); myMove({ type: 'play', seat: me, card: id, as: d.as }, () => studyAfterPlay({ id, as: d.as })); afterChange(); return true; }
       case 'pl-unsel': PLAY.sel = null; renderPlay(); return true;
+      case 'pl-play-sel': {
+        const id = PLAY.sel;
+        if (id == null || !(st.phase === 'play' && st.turn === me) || SK.legalPlays(st, me).indexOf(id) < 0) { PLAY.sel = null; renderPlay(); return true; }
+        const src = document.querySelector(`#v-play .hand [data-id="${id}"]`); if (src) PLAY.fxFrom = src.getBoundingClientRect();
+        PLAY.sel = null; // online the new table comes back as a snapshot, so clear it here
+        myMove({ type: 'play', seat: me, card: id }, () => studyAfterPlay({ id })); afterChange(); return true;
+      }
       case 'pl-hint': if (!PLAY.net) { PLAY.helped = true; save(); } hint(); return true;
       case 'pl-ab': {
         const body = { type: 'ability', seat: me };
@@ -1632,7 +1656,8 @@
       <div class="set-group"><h3>Help while playing</h3>
         ${sw('odds', 'Odds on cards', 'odds')}
         ${sw('study', 'Study mode', 'study')}
-        <div class="set-row"><div class="t">Computer speed</div><div class="seg" style="width:160px"><button data-act="set-speed" data-v="normal" class="${S.speed === 'normal' ? 'on' : ''}">Normal</button><button data-act="set-speed" data-v="fast" class="${S.speed === 'fast' ? 'on' : ''}">Fast</button></div></div>
+        <div class="set-row"><div class="t">Computer speed</div><div class="seg" style="width:190px">${['slow', 'normal', 'fast'].map(v => `<button data-act="set-speed" data-v="${v}" class="${S.speed === v ? 'on' : ''}">${v[0].toUpperCase() + v.slice(1)}</button>`).join('')}</div></div>
+        ${sw('confirm', 'Tap twice to play a card', 'confirm')}
         ${PLAY.state ? `<div class="set-row"><div class="t">Current game</div><button class="btn sm" data-act="pl-quit">Leave game</button></div>` : ''}
       </div>
       ${FXL ? '<div class="set-group"><h3>Sound &amp; effects</h3><div id="fxSet"></div></div>' : ''}

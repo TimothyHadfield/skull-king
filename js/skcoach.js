@@ -36,6 +36,13 @@
       { id: 'special', short: 'Specials', title: 'Special cards', html: '<ul><li><b>Escape</b>: always loses. If everyone escapes, the first escape wins.</li><li><b>Pirate</b> (5): beats every number. Between pirates the first played wins.</li><li><b>Tigress</b>: you choose when you play it: a pirate or an escape.</li><li><b>Skull King</b>: beats pirates and numbers.</li><li><b>Mermaid</b> (2): beat numbers and the Skull King, but lose to pirates. If a pirate, the Skull King and a Mermaid meet, the Mermaid wins.</li></ul>' },
       { id: 'score', short: 'Score', title: 'Scoring', html: '<ul><li>Bid 1 or more and hit it exactly: <b>20 per trick</b> bid, plus bonuses.</li><li>Miss: <b>−10 for each trick</b> you are over or under.</li><li>Bid 0 and take none: <b>10 × cards dealt</b>. Take any: <b>−10 × cards dealt</b>.</li></ul><h4>Bonuses (only when you hit your bid)</h4><ul><li>Each colour 14 you take: +10. The black 14: +20.</li><li>A Mermaid taken by a pirate: +20 each. A pirate taken by the Skull King: +30 each. The Skull King taken by a Mermaid: +40.</li></ul>' },
       { id: 'options', short: 'Options', title: 'Options (Settings)', html: '<ul><li><b>Rascal scoring</b>: every bid is worth 10 per card dealt. Exact gets it all, one off gets half, more is nothing. <b>Cannonball</b>: bet on exact for 15 per card.</li><li><b>Pirate powers</b>: win with a named pirate to use its power (pick the leader, draw and discard, bet, peek at the undealt cards, change your bid).</li><li><b>Kraken</b>: nobody wins that trick. <b>White Whale</b>: specials count for nothing, highest number wins. <b>Loot</b>: an escape that teams you up with the trick winner for +20 each.</li><li><b>Game length</b>: the official shorter and longer schedules.</li></ul>' },
+      { id: 'videos', short: 'Videos', title: 'Videos', html: '<p>Watch the game played (opens YouTube).</p><ul>' + [
+        ['xlFHfCqY-5Y', 'How to play', "Grandpa Beck's Games, the publisher"],
+        ['YkaFYJOAWbc', 'The rules in 4 minutes', 'Brimley Games'],
+        ['GKCeKMEI1ts', 'The rules in 6 minutes', 'The Rules Girl, The Dice Tower'],
+        ['OFhtYdmvroo', 'Full walkthrough with examples', 'GameRules Studio'],
+        ['wqTr78rMvi8', 'Review: how it plays and the different editions', "Taylor's Trick-Taking Table"],
+      ].map(v => `<li><a href="https://www.youtube.com/watch?v=${v[0]}" target="_blank" rel="noopener noreferrer"><b>${v[1]}</b></a><br><span style="opacity:.7;font-size:14px">${v[2]}</span></li>`).join('') + '</ul>' },
     ],
   };
 

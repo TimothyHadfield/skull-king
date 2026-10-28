@@ -344,6 +344,7 @@ select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .hand .cardf.sel { box-shadow: 0 0 0 2px #f0c35a, 0 12px 22px rgba(0,0,0,.5); }
 @media (hover: hover) { .hand .cardf.can:hover:not(.is-up) { --up: 9px; } }
 .hand .cardf .badge { position: absolute; left: 1px; top: -17px; bottom: auto; transform: none; font-size: 10.5px; font-weight: 800; padding: 0 4px; border-radius: 6px; background: rgba(12,8,4,.88); border: 1px solid rgba(255,220,160,.25); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.hand .cardf .badge.drawn { color: var(--gold); border-color: var(--gold); }
 .study { font-size: 13px; color: #e2cfa6; text-align: center; min-height: 18px; }
 .study b { color: #fff6e2; }
 .pl-side { display: none; }

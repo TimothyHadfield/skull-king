@@ -392,9 +392,11 @@
   }
 
   function decideCannon(st, seat, level, rand) {
-    if (level !== 'hard') return { on: false };
+    rand = rand || Math.random;
+    if (level === 'easy') return { on: rand() < 0.25 }; // by feel: a gamble now and then
+    // Medium looks at a small sample of deals, Hard at a bigger one.
     const acc = bidStudy({ hand: st.hands[seat], players: st.humans, before: beforeCount(st, seat), opts: st.opts,
-      scoring: 'rascal', ghost: st.ghost >= 0, samples: 40, rand: rand || Math.random });
+      scoring: 'rascal', ghost: st.ghost >= 0, samples: level === 'hard' ? 40 : 16, rand });
     const row = acc.bids[st.bids[seat]];
     return { on: row.avgCannon > row.avg };
   }

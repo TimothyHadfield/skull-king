@@ -1,5 +1,12 @@
 # Skull King: chat log
 
+## 2026-10-28: wave 3 "just make the games better" (builder agent)
+- **Asked** (Tim via the classic-group manager): "Go ahead and go through each project adding features or changing things that you think should be changed…" Brief: variant parity vs computers, YouTube learn links, practical settings, iPhone layout, small leftovers.
+- **Found**: every rule option already reached computer games (Settings is shared), but only Hard ever chose Cannonball; ladder had never been measured per option.
+- **Built**: Medium/Easy Cannonball choice; `tools/variant-ladder.js`; rules sheet Videos tab; Slow speed; "Tap twice to play a card"; remembered computer table; "Change rules" on the setup; Bendt's drawn cards marked New. Assets ?v=15, pwa data-version 16.
+- **Verified**: tests engine 39, ai 12, online 5, fx 10, profile 9, learn 4 (new ones failed first); WebKit check 42/42 at 393/320/659x393/1280/1440 (25/42 on the old live build); oEmbed 200 + title for all 5 videos; ladder numbers in progress.md.
+- **Open**: see NOT verified.
+
 ## 2026-10-27: improve pass vs BGA (builder agent)
 - **Asked** (manager's per-game brief + `competitor-analysis/card.md`): open on Play, not another tab; Hard > Medium > Easy measured; Undo vs computer and an end-of-game review; shared kits `_coach`, `_profile` 1.1.0, `_pwa` 1.2.0, fx.js re-copied; richer original suit-card art; bigger key-moment animations; no empty bands. Don't touch `js/online.js` or online flows.
 - **Built** (3 commits): opens on Play; Undo + Review; My stats, achievements, Daily, rules sheet, guided first game; install + offline; record line (bids hit %, best round) at game over; suit-coloured number cards with a big emblem; capture spotlight and big-round chip flash. Only online-adjacent edit: `onNetSnap` resets the new PLAY fields for a new online game.
