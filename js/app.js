@@ -1410,7 +1410,7 @@
     if (!window.COACH || !SKC || !tour || PLAY.state || PLAY.net || tab !== 'play' || COACH.offered(SKC.ID)) return;
     setTimeout(() => {
       if (PLAY.state || PLAY.net || tab !== 'play') return;
-      COACH.offer({ id: SKC.ID, title: 'New to Skull King?', text: 'Play one guided round against Easy computers.', yes: 'Teach me', no: 'No thanks', onYes: startTutorial });
+      COACH.offer({ id: SKC.ID, title: 'New to Skull King?', text: 'Play one guided round against Easy computers.', yes: 'Teach me', no: 'No thanks', onYes: startTutorial, place: 'auto', avoid: ['#v-play [data-act="pl-start"]'] });
     }, 400);
   }
 
