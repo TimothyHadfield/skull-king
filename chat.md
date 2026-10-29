@@ -1,7 +1,8 @@
 # Skull King: chat log
 
 ## 2026-10-28: wave 3 kit sweep (builder b3)
-- Kits game-coach 1.2.0 (offer `place:'auto'`, avoid Deal) + game-pwa 1.4.0, assets ?v=17. Verified: all 6 suites green, pwa-check 18/18, offer clear of tab bar and Deal at 393x659/320x568/659x393 (WebKit, fresh storage), settings 320 sw=cw=320, select already themed. Commit 053925d, live.
+- Kits game-coach 1.2.0 (offer `place:'auto'`, avoid Deal) + game-pwa 1.4.0, assets ?v=17. Verified: all 6 suites green, pwa-check 18/18, offer clear of tab bar and Deal at 393x659/320x568/659x393 (WebKit, fresh storage), select already themed. Commit 053925d, live.
+- Then settings at 320: the panel was 301 px in a 288 px scroller (right edge clipped, sideways scroll). Fix: `.set` grid `minmax(0,1fr)` + `.set-row select { overflow:hidden }` (WebKit let the long option text widen the row). After: nothing in Settings wider than its box at 320; laptop still 2 columns. app.css ?v=18, data-version 18. Commit cf44999, live. Seen, not fixed: the "Volume" label is squeezed under its slider at 320 (fx panel).
 
 ## 2026-10-28: wave 3 "just make the games better" (builder agent)
 - **Asked** (Tim via the classic-group manager): "Go ahead and go through each project adding features or changing things that you think should be changed…" Brief: variant parity vs computers, YouTube learn links, practical settings, iPhone layout, small leftovers.

@@ -92,7 +92,7 @@ BID_SCALE 1.15 chosen by tuning (medium mirror avg score: 0.7 → −21, 0.85 �
 - From the common brief: real-table companion first; odds at the point of decision; computers with measured strength; study mode; dark phone-first look on the Hub tokens; $0; no copyrighted art or rule text.
 
 ## Traps
-- **Kits re-copied 2026-10-28 (wave 3 sweep):** game-coach 1.2.0 (the first-visit offer uses `place:'auto'` + `avoid` the Deal button) and game-pwa 1.4.0; assets ?v=17, data-version 17. Copies stay byte-identical to `../_coach` / `../_pwa`.
+- **Kits re-copied 2026-10-28 (wave 3 sweep):** game-coach 1.2.0 (the first-visit offer uses `place:'auto'` + `avoid` the Deal button) and game-pwa 1.4.0; assets ?v=17 (app.css ?v=18), data-version 18. Settings `.set` grid needs `minmax(0,1fr)` and `.set-row select` `overflow:hidden`, or the panel scrolls sideways at 320 px. Copies stay byte-identical to `../_coach` / `../_pwa`.
 - **online.js cache stamp (2026-10-27):** every import of `js/online.js` uses `?v=a3d0418b`, the `_online` content stamp. After a re-copy: put the new stamp from `node ../_online/tools/stamp.mjs` there, bump the importing file's `?v=` (and pwa.js `data-version`), then `node ../_online/tools/stamp.mjs --check .` must say OK.
 - `?auto=1` runs: phone-view's `wait:` step seemed to stall the page's timers; use `waitms:` steps instead.
 - Never use PowerShell Get-Content/Set-Content on project files (mojibake on the UTF-8 card symbols). Edit tool only.
