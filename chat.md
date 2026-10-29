@@ -1,5 +1,8 @@
 # Skull King: chat log
 
+## 2026-10-28: wave 3 kit sweep (builder b3)
+- Kits game-coach 1.2.0 (offer `place:'auto'`, avoid Deal) + game-pwa 1.4.0, assets ?v=17. Verified: all 6 suites green, pwa-check 18/18, offer clear of tab bar and Deal at 393x659/320x568/659x393 (WebKit, fresh storage), settings 320 sw=cw=320, select already themed. Commit 053925d, live.
+
 ## 2026-10-28: wave 3 "just make the games better" (builder agent)
 - **Asked** (Tim via the classic-group manager): "Go ahead and go through each project adding features or changing things that you think should be changed…" Brief: variant parity vs computers, YouTube learn links, practical settings, iPhone layout, small leftovers.
 - **Found**: every rule option already reached computer games (Settings is shared), but only Hard ever chose Cannonball; ladder had never been measured per option.
